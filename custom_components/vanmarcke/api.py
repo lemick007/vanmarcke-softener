@@ -21,31 +21,26 @@ class ErieAPI:
         self._base_url = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1"
         self._session = session  # Utilise la session fournie au lieu d'en créer une nouvelle
 
-    async def authenticate(self) -> bool:
-        """Authentification asynchrone"""
-        try:
-            async with async_timeout.timeout(10):
-                response = await self._session.post(
-                    f"{self._base_url}/auth/sign_in",
-                    json={"email": self._username, "password": self._password},
-                    headers={
-                        "User-Agent": "HomeAssistant/2025.1",
-                        "Accept": "application/json"
-                    }
-                )
-                
-                if response.status == 200:
-                    self._auth = {
-                        "Client": response.headers.get("Client"),
-                        "Access-Token": response.headers.get("Access-Token"),
-                        "uid": response.headers.get("uid")
-                    }
-                    return True
-                
-                raise ErieAuthError(f"Erreur {response.status}: {await response.text()}")
-        
-        except Exception as e:
-            raise ErieAuthError(str(e))
+    async def authenticate(self):
+    try:
+        async with async_timeout.timeout(10):
+            response = await self._session.post(
+                f"{self._base_url}/auth/sign_in",
+                json={"email": self._username, "password": self._password},
+                headers={"User-Agent": "HomeAssistant"}
+            )
+            if response.status != 200:
+                raise InvalidAuth(f"Erreur {response.status}")
+            
+            if response.status == 200:
+                self._auth = {
+                    "Client": response.headers.get("Client"),
+                    "Access-Token": response.headers.get("Access-Token"),
+                    "uid": response.headers.get("uid")
+                }
+                return True
+    except aiohttp.ClientError as e:
+        raise CannotConnect(str(e))
 
     async def get_devices(self) -> list:
         """Récupération des appareils"""
