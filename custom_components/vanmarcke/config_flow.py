@@ -57,12 +57,12 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     _LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s",
                   access_token, client, uid, token_type)
     auth_headers = {
-        "Authorization": f"{token_type} {access_token}",  # Format unifié
-        "Client": client.strip(),
-        "Uid": uid.strip()
+        "Access-Token": headers.get("Access-Token", "").strip(),
+        "Token-Type": headers.get("Token-Type", "Bearer").strip(),
+        "Client": headers.get("Client", "").strip(),
+        "Uid": headers.get("Uid", "").strip()
     }
-
-    _LOGGER.debug("En-têtes d'authentification utilisés pour la suite (sans Token-Type): %s", auth_headers)
+    _LOGGER.debug("En-têtes corrigés : %s", auth_headers)
 
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
     try:
