@@ -1,13 +1,11 @@
 import logging
 import aiohttp
+import asyncio
 import voluptuous as vol
 
-from homeassistant.util.dt import utcnow
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .const import DOMAIN
 
@@ -26,67 +24,66 @@ class NoSoftenerFound(HomeAssistantError):
     """Aucun adoucisseur trouvé pour cet utilisateur."""
 
 async def async_authenticate(hass: HomeAssistant, email: str, password: str):
-    session = async_get_clientsession(hass)
-
+    """
+    Réalise l'authentification et récupère l'ID du premier adoucisseur.
+    
+    Cette version crée une nouvelle session pour reproduire le comportement de ton test,
+    et ajoute un court délai entre la requête d'authentification et celle de récupération des adoucisseurs.
+    """
     _LOGGER.debug("Tentative d'authentification pour %s", email)
-    try:
-        response = await session.post(AUTH_URL, json={"email": email, "password": password})
-    except aiohttp.ClientError as err:
-        _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
-        raise CannotConnect from err
+    # Créer une session dédiée (comme dans ton script test)
+    async with aiohttp.ClientSession() as session:
+        try:
+            response = await session.post(AUTH_URL, json={"email": email, "password": password})
+        except aiohttp.ClientError as err:
+            _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
+            raise CannotConnect from err
 
-    _LOGGER.debug("Réponse d'authentification: %s", response.status)
-    if response.status != 200:
-        _LOGGER.error("Échec de l'authentification, statut %s", response.status)
-        raise InvalidAuth
-    
-    headers = response.headers
-    
-    auth_headers = {
-        "Access-Token": headers.get("Access-Token", ""),
-        "Client": headers.get("Client", ""),
-        "Uid": headers.get("Uid", ""),
-        "Token-Type": headers.get("Token-Type", "Bearer"),
-        #"Expiry": headers.get("Expiry", "0"),
-        #"User-Agent": "App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)",
-        #"App-Version": "3.5.1",
-        #"Language": "en"
-    }
-    _LOGGER.debug("En-têtes : %s", auth_headers)
+        _LOGGER.debug("Réponse d'authentification: %s", response.status)
+        if response.status != 200:
+            _LOGGER.error("Échec de l'authentification, statut %s", response.status)
+            raise InvalidAuth
 
-    _LOGGER.debug("Tentative de récupération des adoucisseurs")
-    session2 = async_create_clientsession(
-        hass,
-        headers={},  # Désactive les headers par défaut de HA
-        auto_cleanup=False
-    )
-    try:
-        response = await session2.get(SOFTENERS_URL, headers=auth_headers)
-    except aiohttp.ClientError as err:
-        _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
-        raise CannotConnect from err
+        headers = response.headers
+        auth_headers = {
+            "Access-Token": headers.get("Access-Token", ""),
+            "Client": headers.get("Client", ""),
+            "Uid": headers.get("Uid", ""),
+            "Token-Type": headers.get("Token-Type", "Bearer"),
+        }
+        _LOGGER.debug("En-têtes d'authentification reçus: %s", auth_headers)
 
-    _LOGGER.debug("Réponse GET water_softeners: %s", response.status)
-    if response.status != 200:
-        text = await response.text()
-        _LOGGER.error("Impossible de récupérer les adoucisseurs, statut %s", response.status)
-        _LOGGER.debug("Réponse du serveur: %s", text)
-        raise CannotConnect
+        # Optionnel : attendre un petit délai pour laisser le temps à l'API de "synchroniser"
+        await asyncio.sleep(0.2)
 
-    try:
-        data = await response.json()
-    except Exception as err:
-        _LOGGER.error("Erreur lors du décodage de la réponse JSON: %s", err)
-        raise CannotConnect from err
+        _LOGGER.debug("Tentative de récupération des adoucisseurs")
+        try:
+            response = await session.get(SOFTENERS_URL, headers=auth_headers)
+        except aiohttp.ClientError as err:
+            _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
+            raise CannotConnect from err
 
-    _LOGGER.debug("Données reçues: %s", data)
-    if not data or not isinstance(data, list) or len(data) == 0:
-        _LOGGER.error("Aucun adoucisseur trouvé pour cet utilisateur.")
-        raise NoSoftenerFound
+        _LOGGER.debug("Réponse GET water_softeners: %s", response.status)
+        if response.status != 200:
+            text = await response.text()
+            _LOGGER.error("Impossible de récupérer les adoucisseurs, statut %s", response.status)
+            _LOGGER.debug("Réponse du serveur: %s", text)
+            raise CannotConnect
 
-    softener_id = data[0]["profile"]["id"]
-    _LOGGER.debug("ID de l'adoucisseur récupéré: %s", softener_id)
-    return auth_headers, softener_id
+        try:
+            data = await response.json()
+        except Exception as err:
+            _LOGGER.error("Erreur lors du décodage de la réponse JSON: %s", err)
+            raise CannotConnect from err
+
+        _LOGGER.debug("Données reçues: %s", data)
+        if not data or not isinstance(data, list) or len(data) == 0:
+            _LOGGER.error("Aucun adoucisseur trouvé pour cet utilisateur.")
+            raise NoSoftenerFound
+
+        softener_id = data[0]["profile"]["id"]
+        _LOGGER.debug("ID de l'adoucisseur récupéré: %s", softener_id)
+        return auth_headers, softener_id
 
 class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Flux de configuration pour l'intégration Vanmarcke Water Softener."""
@@ -113,14 +110,14 @@ class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                 )
             except InvalidAuth:
-                errors["base"] = "invalid_auth"
+                errors["base"] = "Invalid credentials or Auth!"
             except CannotConnect:
-                errors["base"] = "cannot_connect"
+                errors["base"] = "Unable to connect!"
             except NoSoftenerFound:
-                errors["base"] = "no_softener"
+                errors["base"] = "No softener found on your account!"
             except Exception as err:
                 _LOGGER.exception("Erreur inattendue: %s", err)
-                errors["base"] = "unknown"
+                errors["base"] = "Unknown Error..."
 
         schema = vol.Schema({
             vol.Required("email"): str,
