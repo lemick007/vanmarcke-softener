@@ -47,6 +47,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         }
 
     await asyncio.sleep(0.2)
+    # recup devices 
     _LOGGER.debug("Exécution de curl pour récupérer les adoucisseurs")
     curl_command = (
         f'curl -s -X GET "{SOFTENERS_URL}" '
