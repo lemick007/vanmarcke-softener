@@ -26,8 +26,7 @@ class NoSoftenerFound(HomeAssistantError):
 async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     """
     Tente de s'authentifier auprès de l'API et récupère l'ID du premier adoucisseur.
-    
-    Ce code reprend exactement le fonctionnement de ton script test.
+    Renvoie un tuple (auth_headers, softener_id) si la connexion réussit.
     """
     session = async_get_clientsession(hass)
 
@@ -38,30 +37,27 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
         raise CannotConnect from err
 
-    _LOGGER.debug("Réponse d'authentification: %s", response.status)
+    _LOGGER.debug("Réponse de l'authentification: %s", response.status)
     if response.status != 200:
         _LOGGER.error("Échec de l'authentification, statut %s", response.status)
         raise InvalidAuth
 
-    # Récupération des en-têtes tels que reçus (comme dans ton test)
+    # Récupération des en-têtes d'authentification
     headers = response.headers
     access_token = headers.get("Access-Token")
     client = headers.get("Client")
     uid = headers.get("Uid")
-    token_type = headers.get("Token-Type", "Bearer")  # Par défaut "Bearer" si absent
-
-    if not access_token or not client or not uid or not token_type:
+    if not access_token or not client or not uid:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
         raise CannotConnect
 
-    # On construit le dictionnaire d'en-têtes exactement comme dans ton test
+    # Pour les requêtes suivantes, on n'enverra PAS le header "Token-Type"
     auth_headers = {
         "Access-Token": access_token.strip(),
         "Client": client.strip(),
         "Uid": uid.strip(),
-        "Token-Type": token_type.strip(),
     }
-    _LOGGER.debug("En-têtes d'authentification envoyés: %s", auth_headers)
+    _LOGGER.debug("En-têtes d'authentification utilisés pour la suite: %s", auth_headers)
 
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
     try:
@@ -93,7 +89,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     return auth_headers, softener_id
 
 class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
-    """Flux de configuration pour l'intégration Vanmarcke Water Softener."""
+    """Gère le flux de configuration pour l'intégration Vanmarcke Water Softener."""
 
     VERSION = 1
 
