@@ -4,7 +4,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
@@ -29,7 +29,13 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     
     Ce code reprend la logique de ton script test, mais **n'envoie pas le header "Token-Type"** lors de la requête GET.
     """
-    session = async_get_clientsession(hass)
+    session = async_create_clientsession(
+    hass,
+    verify_ssl=True,
+    auto_cleanup=True,
+    headers={}  # Désactive les headers par défaut de HA
+)
+
 
     _LOGGER.debug("Tentative d'authentification pour %s", email)
     try:
