@@ -30,14 +30,19 @@ class ErieAPI:
                 return True
                 
         except aiohttp.ClientError as e:
-            logging.error("Network error: %s", str(e))
+            _LOGGER.error("Network error: %s", str(e))
             raise
         except KeyError as e:
-            logging.error("Missing header: %s", str(e))
+            _LOGGER.error("Missing header: %s", str(e))
             raise
 
     async def get_full_data(self) -> Dict[str, Any]:
-        device_id = await self._get_device_id()
+        try:
+            device_id = await self._get_device_id()
+        except Exception as e:
+            _LOGGER.error("Unable to retrieve device ID: %s", str(e))
+            return {}
+
         endpoints = {
             "dashboard": f"water_softeners/{device_id}/dashboard",
             "settings": f"water_softeners/{device_id}/settings",
@@ -52,45 +57,62 @@ class ErieAPI:
                     f"{self._base_url}/{endpoint}", 
                     headers=self._auth_headers
                 ) as response:
+                    if response.status != 200:
+                        _LOGGER.error(f"Error fetching {key}: HTTP {response.status}")
+                        continue
                     data[key] = await response.json()
             except Exception as e:
-                logging.error("Error fetching %s: %s", key, str(e))
+                _LOGGER.error("Error fetching %s: %s", key, str(e))
         
         return self._parse_data(data)
 
     async def _get_device_id(self) -> str:
         if not self._device_id:
-            async with self._session.get(
-                f"{self._base_url}/water_softeners",
-                headers=self._auth_headers
-            ) as response:
-                devices = await response.json()
-                self._device_id = devices[0]["profile"]["id"]
+            try:
+                async with self._session.get(
+                    f"{self._base_url}/water_softeners",
+                    headers=self._auth_headers
+                ) as response:
+                    if response.status != 200:
+                        raise Exception(f"HTTP error {response.status}")
+                    
+                    devices = await response.json()
+                    if not devices or not isinstance(devices, list):
+                        raise ValueError("No devices found")
+                    
+                    self._device_id = devices[0]["profile"]["id"]
+            except Exception as e:
+                _LOGGER.error("Error retrieving device ID: %s", str(e))
+                raise
         return self._device_id
 
     def _parse_data(self, raw_data: Dict) -> Dict:
         parsed = {}
         try:
             # Dashboard data
+            dashboard = raw_data.get("dashboard", {}).get("status", {})
             parsed.update({
-                "salt_level": raw_data["dashboard"]["status"]["percentage"],
-                "water_volume": raw_data["dashboard"]["status"]["extra"].split()[0],
-                "days_remaining": raw_data["dashboard"]["status"]["days_remaining"]
+                "salt_level": dashboard.get("percentage"),
+                "water_volume": dashboard.get("extra", "0 L").split()[0],
+                "days_remaining": dashboard.get("days_remaining")
             })
             
             # Settings
-            parsed["water_hardness"] = raw_data["settings"]["settings"]["install_hardness"]
+            settings = raw_data.get("settings", {}).get("settings", {})
+            parsed["water_hardness"] = settings.get("install_hardness")
             
             # Last regeneration
-            if raw_data["regenerations"]:
-                parsed["last_regeneration"] = raw_data["regenerations"][0]["datetime"]
-                parsed["salt_used"] = raw_data["regenerations"][0]["salt_used"]
+            regenerations = raw_data.get("regenerations", [])
+            if regenerations:
+                parsed["last_regeneration"] = regenerations[0].get("datetime")
+                parsed["salt_used"] = regenerations[0].get("salt_used")
             
             # Device info
-            parsed["total_volume"] = raw_data["info"]["total_volume"].split()[0]
-            parsed["software_version"] = raw_data["info"]["software"]
+            info = raw_data.get("info", {})
+            parsed["total_volume"] = info.get("total_volume", "0 L").split()[0]
+            parsed["software_version"] = info.get("software")
             
-        except KeyError as e:
-            logging.error("Missing key in data: %s", str(e))
+        except Exception as e:
+            _LOGGER.error("Error parsing data: %s", str(e))
         
         return parsed

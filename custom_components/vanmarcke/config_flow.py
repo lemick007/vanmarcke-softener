@@ -1,10 +1,13 @@
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
+import logging
 
 from .api import ErieAPI
 from .const import DOMAIN, CONF_EMAIL, CONF_PASSWORD
 from .exceptions import CannotConnect, InvalidAuth
+
+_LOGGER = logging.getLogger(__name__)
 
 class VanmarckeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
@@ -31,7 +34,8 @@ class VanmarckeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except Exception:
+            except Exception as e:
+                _LOGGER.error("Unexpected error: %s", str(e), exc_info=True)
                 errors["base"] = "unknown"
 
         data_schema = vol.Schema({
