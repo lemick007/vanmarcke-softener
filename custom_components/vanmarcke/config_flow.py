@@ -51,9 +51,9 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     client = headers.get("Client")
     uid = headers.get("Uid")
     token_type = headers.get("Token-Type", "Bearer")
-    server_time = int(auth_response.headers.get("Server-Time", auth_response.headers.get("Server time", "0")))
+    server_time = int(headers.get("Server-Time", headers.get("Server time", "0")))
     if server_time == 0:
-        _LOGGER.error("Server-Time non reçu dans les headers: %s", auth_response.headers)
+        _LOGGER.error("Server-Time non reçu dans les headers: %s", headers)
         raise CannotConnect
 
     if not access_token or not client or not uid or not token_type:
