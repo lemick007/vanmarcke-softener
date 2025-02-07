@@ -58,9 +58,12 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
                   access_token, client, uid, token_type)
     auth_headers = {
         "Access-Token": headers.get("Access-Token", "").strip(),
-        "Token-Type": headers.get("Token-Type", "Bearer").strip(),
         "Client": headers.get("Client", "").strip(),
-        "Uid": headers.get("Uid", "").strip()
+        "Uid": headers.get("Uid", "").strip(),
+        "Token-Type": headers.get("Token-Type", "Bearer").strip(),
+        "Expiry": headers.get("Expiry", "").strip(),  # NOUVEAU
+        "Vary": "Origin",  # Fixé selon les logs du script
+        "Connection": "close"  # Nécessaire pour contrer le keep-alive HA
     }
     _LOGGER.debug("En-têtes corrigés : %s", auth_headers)
 
