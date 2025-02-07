@@ -1,33 +1,42 @@
 from homeassistant import config_entries
-from erie_connect import ErieConnect, AuthenticationException
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import voluptuous as vol
+
+from .api import ErieAPI
+from .const import DOMAIN, CONF_USERNAME, CONF_PASSWORD
 
 class VanmarckeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Flux de configuration Vanmarcke"""
+    
+    VERSION = 1
+    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
+
     async def async_step_user(self, user_input=None):
         errors = {}
         
         if user_input is not None:
+            # Validation des identifiants
+            session = async_get_clientsession(self.hass)
+            api = ErieAPI(user_input[CONF_USERNAME], user_input[CONF_PASSWORD], session)
+            
             try:
-                api = ErieConnect(
-                    user_input[CONF_EMAIL],
-                    user_input[CONF_PASSWORD]
-                )
-                await self.hass.async_add_executor_job(api.authenticate)
-                
-                return self.async_create_entry(
-                    title="Vanmarcke Softener", 
-                    data=user_input
-                )
-                
-            except AuthenticationException:
+                if await api.authenticate():
+                    return self.async_create_entry(
+                        title=f"Vanmarcke {user_input[CONF_USERNAME]}",
+                        data=user_input
+                    )
                 errors["base"] = "invalid_auth"
-            except Exception:  
+            except Exception:
                 errors["base"] = "cannot_connect"
+
+        # Schéma de formulaire
+        data_schema = vol.Schema({
+            vol.Required(CONF_USERNAME): str,
+            vol.Required(CONF_PASSWORD): str
+        })
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required(CONF_EMAIL): str,
-                vol.Required(CONF_PASSWORD): str
-            }),
+            data_schema=data_schema,
             errors=errors
         )

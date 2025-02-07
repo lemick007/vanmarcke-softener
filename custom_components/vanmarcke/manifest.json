@@ -1,11 +1,10 @@
 {
-    "domain": "vanmarcke_water",
-    "name": "Vanmarcke Water Softener",
-    "version": "1.0.0",
-    "config_flow": true,
-    "documentation": "https://github.com/lemick007/vanmarcke-water-ha",
-    "requirements": [],
-    "codeowners": ["@lemick007"],
-    "iot_class": "cloud_polling"
-  }
-  
+  "domain": "vanmarcke_water",
+  "name": "Vanmarcke Water Softener",
+  "version": "0.0.1",
+  "config_flow": true,
+  "documentation": "https://github.com/lemick007/vanmarcke-water-ha",
+  "requirements": ["aiohttp>=3.7.4"],
+  "codeowners": ["@lemick007"],
+  "iot_class": "cloud_polling"
+}
