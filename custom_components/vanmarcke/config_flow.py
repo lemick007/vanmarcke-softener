@@ -1,10 +1,8 @@
 import logging
 import aiohttp
+import httpx
 import asyncio
 import voluptuous as vol
-
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger("aiohttp.client").setLevel(logging.DEBUG)
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -16,17 +14,6 @@ _LOGGER = logging.getLogger(__name__)
 
 AUTH_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/auth/sign_in"
 SOFTENERS_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/water_softeners"
-
-async def on_request_start(session, trace_config_ctx, params):
-    _LOGGER.debug("Début de la requête: %s %s", params.method, params.url)
-    _LOGGER.debug("En-têtes envoyés: %s", params.headers)
-
-async def on_request_end(session, trace_config_ctx, params):
-    _LOGGER.debug("Fin de la requête: %s %s", params.method, params.url)
-
-trace_config = aiohttp.TraceConfig()
-trace_config.on_request_start.append(on_request_start)
-trace_config.on_request_end.append(on_request_end)
 
 class CannotConnect(HomeAssistantError):
     """Erreur de connexion à l'API."""
@@ -48,8 +35,6 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
             raise CannotConnect from err
 
         _LOGGER.debug("Réponse d'authentification: %s", response.status)
-        _LOGGER.debug("Réponse d'authentification headers: %s", response.headers)
-        _LOGGER.debug("Réponse d'authentification body: %s", await response.text())
         if response.status != 200:
             _LOGGER.error("Échec de l'authentification, statut %s", response.status)
             raise InvalidAuth
@@ -63,22 +48,17 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         }
 
     # -- Nouvelle session pour la requête GET --
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
     _LOGGER.debug("Création d'une nouvelle session pour récupérer les adoucisseurs")
-    async with aiohttp.ClientSession(trace_configs=[trace_config]) as get_session:
-        try:
-            _LOGGER.debug("En-têtes d'authentification: %s", auth_headers)
-            response = await get_session.get(SOFTENERS_URL, headers=auth_headers, params={})
-            _LOGGER.debug("resp: %s", response)
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
-            raise CannotConnect from err
+    async with httpx.AsyncClient() as get_session:
+        _LOGGER.debug("En-têtes d'authentification: %s", auth_headers)
+        response = await get_session.get(SOFTENERS_URL, headers=auth_headers)
+        _LOGGER.debug("resp: %s", response)
 
-        _LOGGER.debug("Réponse GET water_softeners: %s", response.status)
-        if response.status != 200:
-            text = await response.text()
-            _LOGGER.error("Impossible de récupérer les adoucisseurs, statut %s", response.status)
-            _LOGGER.debug("Réponse du serveur: %s", text)
+        _LOGGER.debug("Réponse GET water_softeners: %s", response.status_code)
+        if response.status_code != 200:
+            _LOGGER.error("Impossible de récupérer les adoucisseurs, statut %s", response.status_code)
+            _LOGGER.debug("Réponse du serveur: %s", response.text)
             raise CannotConnect
 
         try:
