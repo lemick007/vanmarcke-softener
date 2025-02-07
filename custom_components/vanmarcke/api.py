@@ -29,7 +29,7 @@ class ErieAPI:
                     "Access-Token": headers.get("Access-Token"),
                     "Client": headers.get("Client"),
                     "Uid": headers.get("Uid"),
-                    "Token-Type": headers.get("Token-Type", "Bearer")
+                    "Token-Type": headers.get("Token-Type")
                 }
                 return True
 
@@ -43,6 +43,7 @@ class ErieAPI:
     async def _get_device_id(self) -> str:
         """Récupère l'ID du premier adoucisseur d'eau."""
         if not self._device_id:
+            _LOGGER.error("Tentative de récupération ID adoucisseur. Headers : %s",json.dumps(self._auth_headers, default=str))
             try:
                 async with self._session.get(
                     f"{self._base_url}/water_softeners",
