@@ -35,7 +35,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
 
         _LOGGER.debug("Réponse d'authentification: %s", response.status)
         _LOGGER.debug("Réponse d'authentification headers: %s", response.headers)
-        _LOGGER.debug("Réponse d'authentification body: %s", response.body)
+        _LOGGER.debug("Réponse d'authentification body: %s", response.text())
         if response.status != 200:
             _LOGGER.error("Échec de l'authentification, statut %s", response.status)
             raise InvalidAuth
