@@ -3,6 +3,9 @@ import aiohttp
 import asyncio
 import voluptuous as vol
 
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("aiohttp.client").setLevel(logging.DEBUG)
+
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -13,6 +16,17 @@ _LOGGER = logging.getLogger(__name__)
 
 AUTH_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/auth/sign_in"
 SOFTENERS_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/water_softeners"
+
+async def on_request_start(session, trace_config_ctx, params):
+    _LOGGER.debug("Début de la requête: %s %s", params.method, params.url)
+    _LOGGER.debug("En-têtes envoyés: %s", params.headers)
+
+async def on_request_end(session, trace_config_ctx, params):
+    _LOGGER.debug("Fin de la requête: %s %s", params.method, params.url)
+
+trace_config = aiohttp.TraceConfig()
+trace_config.on_request_start.append(on_request_start)
+trace_config.on_request_end.append(on_request_end)
 
 class CannotConnect(HomeAssistantError):
     """Erreur de connexion à l'API."""
@@ -51,7 +65,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     # -- Nouvelle session pour la requête GET --
     await asyncio.sleep(1)
     _LOGGER.debug("Création d'une nouvelle session pour récupérer les adoucisseurs")
-    async with aiohttp.ClientSession() as get_session:
+    async with aiohttp.ClientSession(trace_configs=[trace_config]) as get_session:
         try:
             _LOGGER.debug("En-têtes d'authentification: %s", auth_headers)
             response = await get_session.get(SOFTENERS_URL, headers=auth_headers, params={})
