@@ -1,15 +1,16 @@
+from homeassistant.const import PERCENTAGE, TIME_DAYS, FLOW_LITERS_PER_MINUTE
+from homeassistant.util.unit_system import UnitOfVolume  # Ajout pour gérer les unités
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import PERCENTAGE, VOLUME_LITERS, TIME_DAYS, FLOW_LITERS_PER_MINUTE
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN  # Assure-toi que DOMAIN = "vanmarcke_water" est bien défini dans const.py
 
 SENSOR_TYPES = {
     "salt_level": ["Niveau de sel", PERCENTAGE, "mdi:shaker-outline"],
-    "water_volume": ["Volume d'eau restant", VOLUME_LITERS, "mdi:water"],
+    "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water"],
     "days_remaining": ["Jours restants avant régénération", TIME_DAYS, "mdi:calendar"],
     "last_regeneration": ["Dernière régénération", None, "mdi:history"],
-    "total_volume": ["Volume total traité", VOLUME_LITERS, "mdi:chart-bar"],
+    "total_volume": ["Volume total traité", UnitOfVolume.LITERS, "mdi:chart-bar"],
     "software_version": ["Version du logiciel", None, "mdi:information-outline"],
     "flow": ["Débit d'eau", FLOW_LITERS_PER_MINUTE, "mdi:water-pump"],
 }
