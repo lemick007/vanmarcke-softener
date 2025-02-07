@@ -1,6 +1,8 @@
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import PERCENTAGE, FLOW_LITERS_PER_MINUTE
+from homeassistant.const import PERCENTAGE
 from homeassistant.util.unit_conversion import UnitOfVolume  # Pour UnitOfVolume.LITERS
+# Définir localement l'unité pour le débit d'eau
+FLOW_LITERS_PER_MINUTE = "L/min"
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
