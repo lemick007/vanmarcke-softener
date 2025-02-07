@@ -35,7 +35,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
 
         _LOGGER.debug("Réponse d'authentification: %s", response.status)
         _LOGGER.debug("Réponse d'authentification headers: %s", response.headers)
-        _LOGGER.debug("Réponse d'authentification body: %s", response.text())
+        _LOGGER.debug("Réponse d'authentification body: %s", await response.text())
         if response.status != 200:
             _LOGGER.error("Échec de l'authentification, statut %s", response.status)
             raise InvalidAuth
@@ -49,12 +49,12 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         }
 
     # -- Nouvelle session pour la requête GET --
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
     _LOGGER.debug("Création d'une nouvelle session pour récupérer les adoucisseurs")
     async with aiohttp.ClientSession() as get_session:
         try:
             _LOGGER.debug("En-têtes d'authentification: %s", auth_headers)
-            response = await get_session.get(SOFTENERS_URL, headers=auth_headers)
+            response = await get_session.post(SOFTENERS_URL, headers=auth_headers, params={})
             _LOGGER.debug("resp: %s", response)
         except aiohttp.ClientError as err:
             _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
