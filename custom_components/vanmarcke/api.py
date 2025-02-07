@@ -8,13 +8,13 @@ class ErieAPI:
     def __init__(self, email: str, password: str, session):
         self._email = email
         self._password = password
-        self._session = session  # Ici vous pouvez conserver la session HA pour d'autres appels si nécessaire
+        self._session = session  # Utilisation de la session HA pour le POST d'authentification
         self._auth_headers = {}
         self._device_id = None
         self._base_url = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1"
 
     async def authenticate(self) -> bool:
-        # Reste inchangé (utilisation d'aiohttp pour le POST d'authentification)
+        """Authentifie l'utilisateur et stocke les en-têtes nécessaires."""
         try:
             async with self._session.post(
                 f"{self._base_url}/auth/sign_in",
@@ -71,7 +71,7 @@ class ErieAPI:
             try:
                 data[key] = await async_curl_get(url, self._auth_headers)
             except Exception as e:
-                _LOGGER.error("Erreur %s en récupérant %s: %s", e, key, str(e))
+                _LOGGER.error("Erreur en récupérant %s: %s", key, str(e))
         return self._parse_data(data)
 
     def _parse_data(self, raw_data: Dict) -> Dict:
