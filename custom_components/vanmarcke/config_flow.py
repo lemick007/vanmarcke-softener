@@ -14,13 +14,6 @@ _LOGGER = logging.getLogger(__name__)
 AUTH_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/auth/sign_in"
 SOFTENERS_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/water_softeners"
 
-# Classe personnalisée pour forcer "Token-Type" à "Bearer"
-class FixedTokenTypeRequest(aiohttp.ClientRequest):
-    def update_headers(self, headers):
-        super().update_headers(headers)
-        # On force la valeur du header "Token-Type" à "Bearer"
-        self.headers["Token-Type"] = "Bearer"
-
 class CannotConnect(HomeAssistantError):
     """Erreur de connexion à l'API."""
 
@@ -34,15 +27,13 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     """
     Tente de s'authentifier auprès de l'API et récupère l'ID du premier adoucisseur.
     
-    Pour la requête POST d'authentification, on utilise la session HA standard.
-    Pour la requête GET sur les adoucisseurs, on utilise une session dédiée avec
-    une classe de requête personnalisée pour forcer le header "Token-Type".
+    Ce code reprend la logique de ton script test, mais **n'envoie pas le header "Token-Type"** lors de la requête GET.
     """
-    # --- Étape 1 : Authentification (POST) ---
-    ha_session = async_get_clientsession(hass)
+    session = async_get_clientsession(hass)
+
     _LOGGER.debug("Tentative d'authentification pour %s", email)
     try:
-        response = await ha_session.post(AUTH_URL, json={"email": email, "password": password})
+        response = await session.post(AUTH_URL, json={"email": email, "password": password})
     except aiohttp.ClientError as err:
         _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
         raise CannotConnect from err
@@ -52,12 +43,12 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         _LOGGER.error("Échec de l'authentification, statut %s", response.status)
         raise InvalidAuth
 
-    # Récupération des en-têtes tels que reçus
+    # Récupération des en-têtes tels que reçus dans le script test
     headers = response.headers
     access_token = headers.get("Access-Token")
     client = headers.get("Client")
     uid = headers.get("Uid")
-    token_type = headers.get("Token-Type", "Bearer")  # Devrait être "Bearer" dans le test
+    token_type = "Bearer"
 
     if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
@@ -65,23 +56,17 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
 
     _LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s",
                   access_token, client, uid, token_type)
-
-    # Construction du dictionnaire d'en-têtes pour la suite
-    # (On souhaite que Token-Type reste "Bearer", mais nous allons la forcer dans la session GET)
     auth_headers = {
-        "Access-Token": access_token.strip(),
+        "Authorization": f"{token_type} {access_token}",  # Format unifié
         "Client": client.strip(),
-        "Uid": uid.strip(),
-        "Token-Type": token_type.strip(),
+        "Uid": uid.strip()
     }
-    _LOGGER.debug("En-têtes d'authentification envoyés pour POST: %s", auth_headers)
 
-    # --- Étape 2 : Récupération des adoucisseurs (GET) ---
+    _LOGGER.debug("En-têtes d'authentification utilisés pour la suite (sans Token-Type): %s", auth_headers)
+
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
-    # Utilisation d'une session temporaire avec notre classe FixedTokenTypeRequest
     try:
-        async with aiohttp.ClientSession(request_class=FixedTokenTypeRequest) as custom_session:
-            response = await custom_session.get(SOFTENERS_URL, headers=auth_headers)
+        response = await session.get(SOFTENERS_URL, headers=auth_headers)
     except aiohttp.ClientError as err:
         _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
         raise CannotConnect from err
