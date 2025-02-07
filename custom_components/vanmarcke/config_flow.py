@@ -51,10 +51,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     client = headers.get("Client")
     uid = headers.get("Uid")
     token_type = headers.get("Token-Type", "Bearer")
-    server_time = int(headers.get("Server-Time", headers.get("Server time", "0")))
-    if server_time == 0:
-        _LOGGER.error("Server-Time non reçu dans les headers... blocage : %s", headers)
-        raise CannotConnect
+    server_time = int(headers.get("Expiry", "0"))
 
     if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
@@ -67,8 +64,9 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         "Client": headers.get("Client", "").strip(),
         "Uid": headers.get("Uid", "").strip(),
         "Token-Type": headers.get("Token-Type", "Bearer").strip(),
-        "Server-Time": str(server_time),  # Header critique manquant
-        "Client-Time": str(int(utcnow().timestamp()))
+        "Expiry": str(server_time),  # Utilisé comme Server-Time
+        "Client-Time": str(client_time),
+        "Connection": "close"
     }
     _LOGGER.debug("En-têtes : %s", auth_headers)
 
