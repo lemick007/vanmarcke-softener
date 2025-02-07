@@ -1,8 +1,7 @@
-import logging
-import aiohttp
-import httpx
 import asyncio
-import voluptuous as vol
+import json
+import logging
+import shlex
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -17,78 +16,85 @@ SOFTENERS_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/water_so
 
 class CannotConnect(HomeAssistantError):
     """Erreur de connexion à l'API."""
-
+    
 class InvalidAuth(HomeAssistantError):
     """Identifiants invalides."""
-
+    
 class NoSoftenerFound(HomeAssistantError):
     """Aucun adoucisseur trouvé pour cet utilisateur."""
 
 async def async_authenticate(hass: HomeAssistant, email: str, password: str):
-    _LOGGER.debug("Tentative d'authentification pour %s", email)
-    # --- Première session pour l'authentification (POST) ---
-    async with aiohttp.ClientSession() as auth_session:
-        try:
-            response = await auth_session.post(AUTH_URL, json={"email": email, "password": password})
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
-            raise CannotConnect from err
+    # --- Première étape : authentification avec aiohttp (si cela fonctionne) ---
+    # Vous pouvez aussi utiliser curl ici si nécessaire, mais supposons que le POST fonctionne bien.
+    import aiohttp
+    session = aiohttp.ClientSession()
+    try:
+        async with session.post(AUTH_URL, json={"email": email, "password": password}) as response:
+            if response.status != 200:
+                _LOGGER.error("Échec de l'authentification, statut %s", response.status)
+                raise InvalidAuth
+            headers = response.headers
+            # Construction des en-têtes comme dans votre test
+            auth_headers = {
+                "Access-Token": headers.get("Access-Token", "").strip(),
+                "Client": headers.get("Client", "").strip(),
+                "Uid": headers.get("Uid", "").strip(),
+                "Token-Type": headers.get("Token-Type", "Bearer").strip(),
+            }
+            _LOGGER.debug("En-têtes d'authentification reçus: %s", auth_headers)
+    finally:
+        await session.close()
 
-        _LOGGER.debug("Réponse d'authentification: %s", response.status)
-        if response.status != 200:
-            _LOGGER.error("Échec de l'authentification, statut %s", response.status)
-            raise InvalidAuth
+    # Optionnel : attendre un court délai
+    await asyncio.sleep(0.2)
+    
+    # --- Deuxième étape : récupération des adoucisseurs en appelant curl en externe ---
+    # Construire la commande curl avec les mêmes en-têtes
+    # Note : veillez à bien échapper les quotes et à remplacer YOUR_ACCESS_TOKEN, YOUR_CLIENT par les valeurs obtenues.
+    curl_command = (
+        f'curl -s -X GET "{SOFTENERS_URL}" '
+        f'-H "Access-Token: {auth_headers["Access-Token"]}" '
+        f'-H "Client: {auth_headers["Client"]}" '
+        f'-H "Uid: {auth_headers["Uid"]}" '
+        f'-H "Token-Type: {auth_headers["Token-Type"]}"'
+    )
+    _LOGGER.debug("Commande curl: %s", curl_command)
+    # Exécute la commande en mode asynchrone
+    process = await asyncio.create_subprocess_shell(
+        curl_command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode != 0:
+        err_msg = stderr.decode().strip()
+        _LOGGER.error("Erreur lors de l'appel curl: %s", err_msg)
+        raise CannotConnect(f"curl error: {err_msg}")
+    result = stdout.decode().strip()
+    _LOGGER.debug("Sortie de curl: %s", result)
+    try:
+        data = json.loads(result)
+    except Exception as err:
+        _LOGGER.error("Erreur lors du décodage JSON de curl: %s", err)
+        raise CannotConnect from err
 
-        headers = response.headers
-        auth_headers = {
-            "Access-Token": headers.get("Access-Token", ""),
-            "Client": headers.get("Client", ""),
-            "Uid": headers.get("Uid", ""),
-            "Token-Type": headers.get("Token-Type", "Bearer"),
-        }
+    if not data or not isinstance(data, list) or len(data) == 0:
+        _LOGGER.error("Aucun adoucisseur trouvé dans les données.")
+        raise NoSoftenerFound
 
-    # -- Nouvelle session pour la requête GET --
-    await asyncio.sleep(2)
-    _LOGGER.debug("Création d'une nouvelle session pour récupérer les adoucisseurs")
-    async with httpx.AsyncClient() as get_session:
-        _LOGGER.debug("En-têtes d'authentification: %s", auth_headers)
-        response = await get_session.get(SOFTENERS_URL, headers=auth_headers)
-        _LOGGER.debug("resp: %s", response)
-
-        _LOGGER.debug("Réponse GET water_softeners: %s", response.status_code)
-        if response.status_code != 200:
-            _LOGGER.error("Impossible de récupérer les adoucisseurs, statut %s", response.status_code)
-            _LOGGER.debug("Réponse du serveur: %s", response.text)
-            raise CannotConnect
-
-        try:
-            data = await response.json()
-        except Exception as err:
-            _LOGGER.error("Erreur lors du décodage de la réponse JSON: %s", err)
-            raise CannotConnect from err
-
-        _LOGGER.debug("Données reçues: %s", data)
-        if not data or not isinstance(data, list) or len(data) == 0:
-            _LOGGER.error("Aucun adoucisseur trouvé pour cet utilisateur.")
-            raise NoSoftenerFound
-
-        softener_id = data[0]["profile"]["id"]
-        _LOGGER.debug("ID de l'adoucisseur récupéré: %s", softener_id)
-        return auth_headers, softener_id
+    softener_id = data[0]["profile"]["id"]
+    _LOGGER.debug("ID de l'adoucisseur récupéré: %s", softener_id)
+    return auth_headers, softener_id
 
 class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Flux de configuration pour l'intégration Vanmarcke Water Softener."""
-
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Gère le formulaire de configuration présenté à l'utilisateur."""
         errors = {}
-
         if user_input is not None:
             email = user_input.get("email")
             password = user_input.get("password")
-
             try:
                 auth_headers, softener_id = await async_authenticate(self.hass, email, password)
                 return self.async_create_entry(
@@ -101,18 +107,16 @@ class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                 )
             except InvalidAuth:
-                errors["base"] = "Invalid credentials or Auth!"
+                errors["base"] = "invalid_auth"
             except CannotConnect:
-                errors["base"] = "Unable to connect!"
+                errors["base"] = "cannot_connect"
             except NoSoftenerFound:
-                errors["base"] = "No softener found on your account!"
+                errors["base"] = "no_softener"
             except Exception as err:
                 _LOGGER.exception("Erreur inattendue: %s", err)
-                errors["base"] = "Unknown Error..."
-
+                errors["base"] = "unknown"
         schema = vol.Schema({
             vol.Required("email"): str,
             vol.Required("password"): str,
         })
-
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
