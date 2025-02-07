@@ -25,13 +25,7 @@ class NoSoftenerFound(HomeAssistantError):
     """Aucun adoucisseur trouvé pour cet utilisateur."""
 
 async def async_authenticate(hass: HomeAssistant, email: str, password: str):
-    """
-    Tente de s'authentifier auprès de l'API et récupère l'ID du premier adoucisseur.
-    
-    Ce code reprend la logique de ton script test, mais **n'envoie pas le header "Token-Type"** lors de la requête GET.
-    """
     session = async_get_clientsession(hass)
-
 
     _LOGGER.debug("Tentative d'authentification pour %s", email)
     try:
@@ -45,27 +39,15 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         _LOGGER.error("Échec de l'authentification, statut %s", response.status)
         raise InvalidAuth
     
-    # Récupération des en-têtes tels que reçus dans le script test
     headers = response.headers
-    access_token = headers.get("Access-Token")
-    client = headers.get("Client")
-    uid = headers.get("Uid")
-    token_type = headers.get("Token-Type", "Bearer")
-    expiry = int(headers.get("Expiry", "0"))
-
-    if not access_token or not client or not uid or not token_type:
-        _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
-        raise CannotConnect
-
-    #_LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s, Expiry=%s", access_token, client, uid, token_type, expiry)
     auth_headers = {
-        "Access-Token": headers.get("Access-Token", "").strip(),
-        "Client": headers.get("Client", "").strip(),
-        "Uid": headers.get("Uid", "").strip(),
-        "Token-Type": headers.get("Token-Type", "Bearer").strip(),
-        "Expiry": str(headers.get("Expiry", "0")),  # Conversion en string
+        "Access-Token": headers.get("Access-Token", ""),
+        "Client": headers.get("Client", ""),
+        "Uid": headers.get("Uid", ""),
+        "Token-Type": headers.get("Token-Type", "Bearer"),
+        "Expiry": headers.get("Expiry", "0"),
         "User-Agent": "App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)",
-        "App-Version": "3.5.1",  # Utiliser des tirets pour les noms d'en-tête
+        "App-Version": "3.5.1",
         "Language": "en"
     }
     _LOGGER.debug("En-têtes : %s", auth_headers)
