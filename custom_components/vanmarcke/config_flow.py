@@ -61,7 +61,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         "Access-Token": access_token.strip(),
         "Client": client.strip(),
         "Uid": uid.strip(),
-        "Token-Type": token_type.strip(),"
+        "Token-Type": token_type.strip(),
     }
     _LOGGER.debug("En-têtes d'authentification utilisés pour la suite (sans Token-Type): %s", auth_headers)
 
