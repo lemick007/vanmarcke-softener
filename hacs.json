@@ -1,0 +1,9 @@
+{
+    "name": "Vanmarcke Water Softener",
+    "render_readme": true,
+    "homeassistant": "2025.1.0",
+    "country": ["BE", "FR", "LU"],
+    "zip_release": false,
+    "filename": null
+  }
+  
