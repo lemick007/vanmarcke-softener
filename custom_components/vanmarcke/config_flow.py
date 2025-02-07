@@ -54,7 +54,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     async with aiohttp.ClientSession() as get_session:
         try:
             _LOGGER.debug("En-têtes d'authentification: %s", auth_headers)
-            response = await get_session.post(SOFTENERS_URL, headers=auth_headers, params={})
+            response = await get_session.get(SOFTENERS_URL, headers=auth_headers, params={})
             _LOGGER.debug("resp: %s", response)
         except aiohttp.ClientError as err:
             _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
