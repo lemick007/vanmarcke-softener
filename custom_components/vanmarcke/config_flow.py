@@ -27,7 +27,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     """
     Tente de s'authentifier auprès de l'API et récupère l'ID du premier adoucisseur.
     
-    Ce code reprend la logique de ton script test, mais force le header "Token-Type" à "Bearer".
+    Ce code reprend la logique de ton script test, mais **n'envoie pas le header "Token-Type"** lors de la requête GET.
     """
     session = async_get_clientsession(hass)
 
@@ -43,27 +43,27 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         _LOGGER.error("Échec de l'authentification, statut %s", response.status)
         raise InvalidAuth
 
-    # Récupération des en-têtes tels que reçus
+    # Récupération des en-têtes tels que reçus dans le script test
     headers = response.headers
     access_token = headers.get("Access-Token")
     client = headers.get("Client")
     uid = headers.get("Uid")
-    # On force la valeur de Token-Type à "Bearer"
-    token_type = "Bearer"
+    token_type = headers.get("Token-Type", "Bearer")  # normalement "Bearer"
 
-    if not access_token or not client or not uid:
+    if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
         raise CannotConnect
 
-    # Construction du dictionnaire d'en-têtes identique à celui de ton script test,
-    # en forçant Token-Type à "Bearer"
+    _LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s",
+                  access_token, client, uid, token_type)
+
+    # Pour la requête GET, on **n'enverra PAS** le header "Token-Type"
     auth_headers = {
         "Access-Token": access_token.strip(),
         "Client": client.strip(),
         "Uid": uid.strip(),
-        "Token-Type": token_type,
     }
-    _LOGGER.debug("En-têtes d'authentification envoyés: %s", auth_headers)
+    _LOGGER.debug("En-têtes d'authentification utilisés pour la suite (sans Token-Type): %s", auth_headers)
 
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
     try:
