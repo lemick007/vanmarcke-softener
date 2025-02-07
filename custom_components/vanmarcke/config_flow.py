@@ -14,6 +14,14 @@ class VanmarckeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         errors = {}
         
+
+        session = async_get_clientsession(self.hass)
+        api = ErieAPI(
+            username=user_input[CONF_USERNAME],
+            password=user_input[CONF_PASSWORD],
+            session=session  # Session correctement passée
+        )
+
         if user_input is not None:
             # Validation des identifiants
             session = async_get_clientsession(self.hass)

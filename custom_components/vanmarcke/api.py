@@ -13,13 +13,13 @@ class ErieAuthError(ErieAPIError):
     """Erreur d'authentification"""
 
 class ErieAPI:
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str, password: str, session: aiohttp.ClientSession):
         self._username = username
         self._password = password
-        self._auth: Optional[Dict[str, str]] = None
-        self._device_id: Optional[int] = None
+        self._auth = None
+        self._device_id = None
         self._base_url = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1"
-        self._session = aiohttp.ClientSession()
+        self._session = session  # Utilise la session fournie au lieu d'en créer une nouvelle
 
     async def authenticate(self) -> bool:
         """Authentification asynchrone"""
@@ -115,5 +115,5 @@ class ErieAPI:
             raise ErieAPIError("Réponse JSON invalide")
 
     async def close(self):
-        """Fermeture propre de la session"""
-        await self._session.close()
+        """Ne plus fermer la session ici car gérée par HA"""
+        pass  # Retirer le await self._session.close()
