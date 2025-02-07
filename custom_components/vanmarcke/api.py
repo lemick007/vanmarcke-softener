@@ -28,20 +28,23 @@ class ErieAPI:
         try:
             async with async_timeout.timeout(10):
                 async with self._session.post(url, json=data) as response:
-                    print("Status:", response.status)
-                    print("Headers:", response.headers)  # DEBUG
-                    print("Body:", await response.text())  # DEBUG
+                    body = await response.json()
+                    headers = response.headers
 
                     if response.status == 200:
-                        # Récupérer les en-têtes d'authentification
                         self._auth = {
-                            "Access-Token": response.headers.get("Access-Token"),
-                            "Client": response.headers.get("Client"),
-                            "Uid": response.headers.get("Uid"),
-                            "Token-Type": response.headers.get("Token-Type"),
+                            "Access-Token": headers.get("Access-Token"),
+                            "Client": headers.get("Client"),
+                            "Uid": headers.get("Uid"),  
+                            "Token-Type": headers.get("Token-Type"),
                         }
-                        return True  # Auth réussie
-                    
+
+                        if not self._auth["Uid"]:
+                            _LOGGER.error("Erreur: 'Uid' non trouvé dans les headers !")
+                            raise KeyError("Uid manquant")
+
+                        return True
+
                     elif response.status == 401:
                         raise InvalidAuth("Invalid credentials")
                     else:
