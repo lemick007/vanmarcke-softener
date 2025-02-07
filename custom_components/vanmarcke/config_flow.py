@@ -24,17 +24,11 @@ class NoSoftenerFound(HomeAssistantError):
     """Aucun adoucisseur trouvé pour cet utilisateur."""
 
 async def async_authenticate(hass: HomeAssistant, email: str, password: str):
-    """
-    Réalise l'authentification et récupère l'ID du premier adoucisseur.
-    
-    Cette version crée une nouvelle session pour reproduire le comportement de ton test,
-    et ajoute un court délai entre la requête d'authentification et celle de récupération des adoucisseurs.
-    """
     _LOGGER.debug("Tentative d'authentification pour %s", email)
-    # Créer une session dédiée (comme dans ton script test)
-    async with aiohttp.ClientSession() as session:
+    # --- Première session pour l'authentification (POST) ---
+    async with aiohttp.ClientSession() as auth_session:
         try:
-            response = await session.post(AUTH_URL, json={"email": email, "password": password})
+            response = await auth_session.post(AUTH_URL, json={"email": email, "password": password})
         except aiohttp.ClientError as err:
             _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
             raise CannotConnect from err
@@ -53,12 +47,14 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         }
         _LOGGER.debug("En-têtes d'authentification reçus: %s", auth_headers)
 
-        # Optionnel : attendre un petit délai pour laisser le temps à l'API de "synchroniser"
-        await asyncio.sleep(0.2)
+    # Optionnel : attendre un court délai pour laisser le temps à l'API de se préparer
+    await asyncio.sleep(0.2)
 
-        _LOGGER.debug("Tentative de récupération des adoucisseurs")
+    # --- Nouvelle session pour la requête GET ---
+    _LOGGER.debug("Création d'une nouvelle session pour récupérer les adoucisseurs")
+    async with aiohttp.ClientSession() as get_session:
         try:
-            response = await session.get(SOFTENERS_URL, headers=auth_headers)
+            response = await get_session.get(SOFTENERS_URL, headers=auth_headers)
         except aiohttp.ClientError as err:
             _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
             raise CannotConnect from err
