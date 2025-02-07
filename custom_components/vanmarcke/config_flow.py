@@ -2,6 +2,7 @@ import logging
 import aiohttp
 import asyncio
 import voluptuous as vol
+import json
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
