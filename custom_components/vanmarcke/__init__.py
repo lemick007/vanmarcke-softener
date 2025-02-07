@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import ErieAPI  # Votre classe ErieAPI est définie dans api.py
+from .api import ErieAPI
 from .const import DOMAIN
 from .coordinator import VanmarckeWaterCoordinator
 
@@ -19,14 +19,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         password=entry.data["password"],
         session=session,
     )
-
+    # Assigner le device_id choisi par l'utilisateur
+    api._device_id = entry.data["device_id"]
     coordinator = VanmarckeWaterCoordinator(hass, api)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Important : await ici pour éviter le warning
+    # Attendre l'importation de la plateforme sensor
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     return True
 

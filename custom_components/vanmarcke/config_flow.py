@@ -1,124 +1,94 @@
 import logging
-import aiohttp
-import asyncio
 import voluptuous as vol
-import json
+import aiohttp
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 
+from .api import ErieAPI
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-AUTH_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/auth/sign_in"
-SOFTENERS_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/water_softeners"
-
-class CannotConnect(HomeAssistantError):
+class CannotConnect(Exception):
     """Erreur de connexion à l'API."""
+    pass
 
-class InvalidAuth(HomeAssistantError):
+class InvalidAuth(Exception):
     """Identifiants invalides."""
+    pass
 
-class NoSoftenerFound(HomeAssistantError):
+class NoSoftenerFound(Exception):
     """Aucun adoucisseur trouvé pour cet utilisateur."""
+    pass
 
-async def async_authenticate(hass: HomeAssistant, email: str, password: str):
-    _LOGGER.debug("Tentative d'authentification pour %s", email)
-    # --- Première session pour l'authentification (POST) ---
-    async with aiohttp.ClientSession() as auth_session:
-        try:
-            response = await auth_session.post(AUTH_URL, json={"email": email, "password": password})
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
-            raise CannotConnect from err
-
-        _LOGGER.debug("Réponse d'authentification: %s", response.status)
-        if response.status != 200:
-            _LOGGER.error("Échec de l'authentification, statut %s", response.status)
-            raise InvalidAuth
-
-        headers = response.headers
-        auth_headers = {
-            "Access-Token": headers.get("Access-Token", ""),
-            "Client": headers.get("Client", ""),
-            "Uid": headers.get("Uid", ""),
-            "X-Token-Type": headers.get("Token-Type", "Bearer"),
-        }
-
-    # recup devices 
-    _LOGGER.debug("Exécution de curl pour récupérer les adoucisseurs")
-    curl_command = (
-        f'curl -s -X GET "{SOFTENERS_URL}" '
-        f'-H "Access-Token: {headers.get("Access-Token", "")}" '
-        f'-H "Client: {headers.get("Client", "")}" '
-        f'-H "Uid: {headers.get("Uid", "")}" '
-        f'-H "Token-Type: {headers.get("Token-Type", "Bearer")}"'
-    )
-    _LOGGER.debug("Commande curl: %s", curl_command)
-    process = await asyncio.create_subprocess_shell(
-        curl_command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
-    if process.returncode != 0:
-        err_msg = stderr.decode().strip()
-        _LOGGER.error("Erreur lors de l'exécution de curl: %s", err_msg)
-        raise CannotConnect(f"curl error: {err_msg}")
-    result = stdout.decode().strip()
-    _LOGGER.debug("Résultat de curl: %s", result)
-    try:
-        data = json.loads(result)
-    except Exception as err:
-        _LOGGER.error("Erreur lors du décodage JSON de la réponse de curl: %s", err)
-        raise CannotConnect from err
-    _LOGGER.debug("Données reçues: %s", data)
-    if not data or not isinstance(data, list) or len(data) == 0:
-        _LOGGER.error("Aucun adoucisseur trouvé pour cet utilisateur.")
-        raise NoSoftenerFound
-    softener_id = data[0]["profile"]["id"]
-    _LOGGER.debug("ID de l'adoucisseur récupéré: %s", softener_id)
-    return auth_headers, softener_id
-    
-class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+class VanmarckeWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Flux de configuration pour l'intégration Vanmarcke Water Softener."""
-
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Gère le formulaire de configuration présenté à l'utilisateur."""
         errors = {}
-
         if user_input is not None:
             email = user_input.get("email")
             password = user_input.get("password")
-
-            try:
-                auth_headers, softener_id = await async_authenticate(self.hass, email, password)
-                return self.async_create_entry(
-                    title=f"Adoucisseur {softener_id}",
-                    data={
-                        "email": email,
-                        "password": password,
-                        "auth_headers": dict(auth_headers),
-                        "softener_id": softener_id,
-                    },
+            session = aiohttp.ClientSession()
+            api = ErieAPI(email, password, session)
+            if not await api.authenticate():
+                errors["base"] = "invalid_auth"
+                await session.close()
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=vol.Schema({
+                        vol.Required("email"): str,
+                        vol.Required("password"): str,
+                    }),
+                    errors=errors
                 )
-            except InvalidAuth:
-                errors["base"] = "Invalid credentials or Auth!"
-            except CannotConnect:
-                errors["base"] = "Unable to connect!"
-            except NoSoftenerFound:
-                errors["base"] = "No softener found on your account!"
-            except Exception as err:
-                _LOGGER.exception("Erreur inattendue: %s", err)
-                errors["base"] = "Unknown Error..."
-
+            devices = await api.get_all_devices()
+            await session.close()
+            if not devices:
+                errors["base"] = "no_softener"
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=vol.Schema({
+                        vol.Required("email"): str,
+                        vol.Required("password"): str,
+                    }),
+                    errors=errors
+                )
+            if len(devices) == 1:
+                device_id = devices[0]["id"]
+                data = {
+                    "email": email,
+                    "password": password,
+                    "device_id": device_id,
+                }
+                return self.async_create_entry(title=f"Adoucisseur {device_id}", data=data)
+            else:
+                self.context["devices"] = devices
+                self.context["email"] = email
+                self.context["password"] = password
+                return await self.async_step_select_device()
         schema = vol.Schema({
             vol.Required("email"): str,
             vol.Required("password"): str,
         })
-
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_select_device(self, user_input=None):
+        devices = self.context["devices"]
+        email = self.context["email"]
+        password = self.context["password"]
+        device_options = {device["id"]: f'{device.get("name", "Adoucisseur")} ({device["id"]})' for device in devices}
+        schema = vol.Schema({
+            vol.Required("device_id"): vol.In(device_options)
+        })
+        if user_input is not None:
+            selected_device = user_input["device_id"]
+            data = {
+                "email": email,
+                "password": password,
+                "device_id": selected_device,
+            }
+            return self.async_create_entry(title=f"Adoucisseur {selected_device}", data=data)
+        return self.async_show_form(step_id="select_device", data_schema=schema)

@@ -14,7 +14,7 @@ async def async_curl_get(url: str, headers: Dict[str, str]) -> Any:
     Effectue une requête GET via la commande curl, en passant exactement les headers spécifiés.
     Retourne les données décodées en JSON.
     """
-    # Vérifie que tous les headers requis sont présents
+    # Vérifier que tous les headers requis sont présents
     required_headers = ["Access-Token", "Client", "Uid", "Token-Type"]
     missing = [h for h in required_headers if not headers.get(h)]
     if missing:

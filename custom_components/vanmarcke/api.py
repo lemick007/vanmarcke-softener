@@ -10,7 +10,7 @@ class ErieAPI:
         self._password = password
         self._session = session  # Utilisation de la session HA pour le POST d'authentification
         self._auth_headers = {}
-        self._device_id = None
+        self._device_id = None  # Cet attribut sera défini par la configuration (choix de l'utilisateur)
         self._base_url = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1"
 
     async def authenticate(self) -> bool:
@@ -36,21 +36,26 @@ class ErieAPI:
             _LOGGER.error("Erreur lors de l'authentification: %s", str(e))
             return False
 
+    async def get_all_devices(self) -> list:
+        """Récupère la liste de tous les adoucisseurs disponibles."""
+        url = f"{self._base_url}/water_softeners"
+        try:
+            data = await async_curl_get(url, self._auth_headers)
+        except Exception as e:
+            _LOGGER.error("Erreur lors de la récupération des appareils via curl: %s", str(e))
+            return []
+        devices = []
+        if isinstance(data, list):
+            for item in data:
+                if "profile" in item:
+                    devices.append({
+                        "id": item["profile"]["id"],
+                        "name": item["profile"].get("name", "Adoucisseur")
+                    })
+        return devices
+
     async def _get_device_id(self) -> str:
-        """Utilise le wrapper curl pour récupérer l'ID du premier adoucisseur d'eau."""
-        if not self._device_id:
-            url = f"{self._base_url}/water_softeners"
-            _LOGGER.debug("En-têtes envoyés avec curl: %s", self._auth_headers)
-            try:
-                data = await async_curl_get(url, self._auth_headers)
-            except Exception as e:
-                _LOGGER.error("Erreur lors de la récupération du device_id via curl: %s", str(e))
-                return None
-            if isinstance(data, list) and data:
-                self._device_id = data[0]["profile"]["id"]
-            else:
-                _LOGGER.warning("Aucun adoucisseur trouvé")
-                return None
+        """Récupère l'ID de l'appareil à utiliser, déjà défini dans la configuration."""
         return self._device_id
 
     async def get_full_data(self) -> Dict[str, Any]:

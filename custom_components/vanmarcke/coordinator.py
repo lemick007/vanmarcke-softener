@@ -7,7 +7,7 @@ import logging
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import ErieAPI  # Votre fichier api.py doit définir ErieAPI
+from .api import ErieAPI
 
 _LOGGER = logging.getLogger(__name__)
 
