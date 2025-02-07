@@ -25,11 +25,12 @@ class ErieAPI:
                     return False
                 headers = response.headers
                 self._auth_headers = {
-                    "Access-Token": headers.get("Access-Token"),
-                    "Client": headers.get("Client"),
-                    "Uid": headers.get("Uid"),
-                    "Token-Type": headers.get("Token-Type")
+                    "Access-Token": headers.get("Access-Token", "").strip(),
+                    "Client": headers.get("Client", "").strip(),
+                    "Uid": headers.get("Uid", "").strip(),
+                    "Token-Type": headers.get("Token-Type", "").strip()
                 }
+                _LOGGER.debug("En-têtes récupérés après l'authentification: %s", self._auth_headers)
                 return True
         except Exception as e:
             _LOGGER.error("Erreur lors de l'authentification: %s", str(e))
@@ -39,6 +40,8 @@ class ErieAPI:
         """Utilise le wrapper curl pour récupérer l'ID du premier adoucisseur d'eau."""
         if not self._device_id:
             url = f"{self._base_url}/water_softeners"
+            _LOGGER.debug("En-têtes envoyés avec curl: %s", headers)
+            _LOGGER.debug("En-têtes 2 envoyés avec curl: %s", self._auth_headers)
             try:
                 data = await async_curl_get(url, self._auth_headers)
             except Exception as e:
