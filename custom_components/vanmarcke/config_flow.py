@@ -75,6 +75,16 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     }
     _LOGGER.debug("En-têtes : %s", auth_headers)
 
+    server_time = int(response.headers.get("Server-Time", "0"))
+    if server_time == 0:
+        raise ValueError("Server-Time manquant dans les headers")
+
+    client_time = int(utcnow().timestamp())
+    if abs(client_time - server_time) > 300:  # 5 min de marge
+        _LOGGER.error("Désynchronisation temporelle serveur/client: %s vs %s", 
+                    server_time, client_time)
+        raise CannotConnect
+
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
     try:
         response = await session.get(SOFTENERS_URL, headers=auth_headers)
