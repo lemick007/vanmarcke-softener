@@ -40,8 +40,7 @@ class ErieAPI:
         """Utilise le wrapper curl pour récupérer l'ID du premier adoucisseur d'eau."""
         if not self._device_id:
             url = f"{self._base_url}/water_softeners"
-            _LOGGER.debug("En-têtes envoyés avec curl: %s", headers)
-            _LOGGER.debug("En-têtes 2 envoyés avec curl: %s", self._auth_headers)
+            _LOGGER.debug("En-têtes envoyés avec curl: %s", self._auth_headers)
             try:
                 data = await async_curl_get(url, self._auth_headers)
             except Exception as e:
