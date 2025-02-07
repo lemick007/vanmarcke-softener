@@ -30,12 +30,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     
     Ce code reprend la logique de ton script test, mais **n'envoie pas le header "Token-Type"** lors de la requête GET.
     """
-    session = async_create_clientsession(
-    hass,
-    verify_ssl=True,
-    auto_cleanup=True,
-    headers={}  # Désactive les headers par défaut de HA
-)
+    session = async_create_clientsession(hass)
 
 
     _LOGGER.debug("Tentative d'authentification pour %s", email)
@@ -49,15 +44,17 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     if response.status != 200:
         _LOGGER.error("Échec de l'authentification, statut %s", response.status)
         raise InvalidAuth
-
+    
     # Récupération des en-têtes tels que reçus dans le script test
     headers = response.headers
     access_token = headers.get("Access-Token")
     client = headers.get("Client")
     uid = headers.get("Uid")
     token_type = headers.get("Token-Type", "Bearer")
-    server_time = int(response.headers.get("Server-Time", "0"))
-    _LOGGER.debug("Timestamp serveur : %s", server_time)
+    server_time = int(auth_response.headers.get("Server-Time", auth_response.headers.get("Server time", "0")))
+    if server_time == 0:
+        _LOGGER.error("Server-Time non reçu dans les headers: %s", auth_response.headers)
+        raise CannotConnect
 
     if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
