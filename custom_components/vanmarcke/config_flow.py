@@ -52,6 +52,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     uid = headers.get("Uid")
     token_type = headers.get("Token-Type", "Bearer")
     server_time = int(headers.get("Expiry", "0"))
+    client_time = int(utcnow().timestamp())
 
     if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
