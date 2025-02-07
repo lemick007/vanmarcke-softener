@@ -1,29 +1,28 @@
-import aiohttp
-import logging
 from typing import Any, Dict
+import logging
+from .curl_wrapper import async_curl_get, CannotConnect
 
 _LOGGER = logging.getLogger(__name__)
 
 class ErieAPI:
-    def __init__(self, email: str, password: str, session: aiohttp.ClientSession):
+    def __init__(self, email: str, password: str, session):
         self._email = email
         self._password = password
-        self._session = session
+        self._session = session  # Ici vous pouvez conserver la session HA pour d'autres appels si nécessaire
         self._auth_headers = {}
         self._device_id = None
         self._base_url = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1"
 
     async def authenticate(self) -> bool:
-        """Authentifie l'utilisateur et stocke les en-têtes nécessaires."""
+        # Reste inchangé (utilisation d'aiohttp pour le POST d'authentification)
         try:
             async with self._session.post(
                 f"{self._base_url}/auth/sign_in",
                 json={"email": self._email, "password": self._password}
             ) as response:
                 if response.status != 200:
-                    _LOGGER.error(f"Échec de l'authentification: HTTP {response.status}")
+                    _LOGGER.error("Échec de l'authentification: HTTP %s", response.status)
                     return False
-                
                 headers = response.headers
                 self._auth_headers = {
                     "Access-Token": headers.get("Access-Token"),
@@ -32,44 +31,31 @@ class ErieAPI:
                     "Token-Type": headers.get("Token-Type")
                 }
                 return True
-
-        except aiohttp.ClientError as e:
-            _LOGGER.error("Erreur réseau lors de l'authentification: %s", str(e))
-            return False
-        except KeyError as e:
-            _LOGGER.error("En-tête manquant lors de l'authentification: %s", str(e))
+        except Exception as e:
+            _LOGGER.error("Erreur lors de l'authentification: %s", str(e))
             return False
 
     async def _get_device_id(self) -> str:
-        """Récupère l'ID du premier adoucisseur d'eau."""
+        """Utilise le wrapper curl pour récupérer l'ID du premier adoucisseur d'eau."""
         if not self._device_id:
+            url = f"{self._base_url}/water_softeners"
             try:
-                async with self._session.get(
-                    f"{self._base_url}/water_softeners",
-                    headers=self._auth_headers
-                ) as response:
-                    if response.status != 200:
-                        _LOGGER.error("Échec de récupération du device_id: HTTP %s", response.status)
-                        return None
-                    
-                    data = await response.json()
-                    if isinstance(data, list) and data:
-                        self._device_id = data[0]["profile"]["id"]
-                    else:
-                        _LOGGER.warning("Aucun adoucisseur trouvé")
-                        return None
+                data = await async_curl_get(url, self._auth_headers)
             except Exception as e:
-                _LOGGER.error("Erreur lors de la récupération du device_id: %s", str(e))
+                _LOGGER.error("Erreur lors de la récupération du device_id via curl: %s", str(e))
                 return None
-        
+            if isinstance(data, list) and data:
+                self._device_id = data[0]["profile"]["id"]
+            else:
+                _LOGGER.warning("Aucun adoucisseur trouvé")
+                return None
         return self._device_id
 
     async def get_full_data(self) -> Dict[str, Any]:
-        """Récupère toutes les données pertinentes de l'adoucisseur."""
+        """Récupère toutes les données pertinentes de l'adoucisseur en utilisant le wrapper pour GET."""
         device_id = await self._get_device_id()
         if not device_id:
             return {}
-
         endpoints = {
             "dashboard": f"water_softeners/{device_id}/dashboard",
             "settings": f"water_softeners/{device_id}/settings",
@@ -77,43 +63,34 @@ class ErieAPI:
             "info": f"water_softeners/{device_id}/info",
             "flow": f"water_softeners/{device_id}/flow"
         }
-        
         data = {}
         for key, endpoint in endpoints.items():
+            url = f"{self._base_url}/{endpoint}"
             try:
-                async with self._session.get(
-                    f"{self._base_url}/{endpoint}",
-                    headers=self._auth_headers
-                ) as response:
-                    if response.status == 200:
-                        data[key] = await response.json()
-                    else:
-                        _LOGGER.error(f"Erreur {response.status} en récupérant {key}")
+                data[key] = await async_curl_get(url, self._auth_headers)
             except Exception as e:
-                _LOGGER.error("Erreur en récupérant %s: %s", key, str(e))
-        
+                _LOGGER.error("Erreur %s en récupérant %s: %s", e, key, str(e))
         return self._parse_data(data)
 
-    def _parse_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transforme les données brutes en données exploitables."""
-        if not data:
-            return {}
-
+    def _parse_data(self, raw_data: Dict) -> Dict:
+        parsed = {}
         try:
-            dashboard = data.get("dashboard", {})
-            info = data.get("info", {})
-            settings = data.get("settings", {})
-            flow = data.get("flow", {})
-
-            return {
-                "salt_level": dashboard.get("status", {}).get("percentage"),
-                "water_volume": dashboard.get("status", {}).get("extra"),
-                "days_remaining": dashboard.get("status", {}).get("days_remaining"),
-                "last_regeneration": info.get("last_regeneration"),
-                "total_volume": info.get("total_volume"),
-                "software_version": info.get("software"),
-                "flow": flow.get("flow")
-            }
+            dashboard = raw_data.get("dashboard", {}).get("status", {})
+            info = raw_data.get("info", {})
+            settings = raw_data.get("settings", {}).get("settings", {})
+            flow = raw_data.get("flow", {})
+            parsed.update({
+                "salt_level": dashboard.get("percentage"),
+                "water_volume": dashboard.get("extra", "0 L").split()[0],
+                "days_remaining": dashboard.get("days_remaining")
+            })
+            parsed["water_hardness"] = settings.get("install_hardness")
+            regenerations = raw_data.get("regenerations", [])
+            if regenerations:
+                parsed["last_regeneration"] = regenerations[0].get("datetime")
+            parsed["total_volume"] = info.get("total_volume", "0 L").split()[0]
+            parsed["software_version"] = info.get("software")
+            parsed["flow"] = flow.get("flow")
         except Exception as e:
             _LOGGER.error("Erreur lors du parsing des données: %s", str(e))
-            return {}
+        return parsed

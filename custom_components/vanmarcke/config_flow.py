@@ -47,7 +47,6 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
             "X-Token-Type": headers.get("Token-Type", "Bearer"),
         }
 
-    await asyncio.sleep(0.2)
     # recup devices 
     _LOGGER.debug("Exécution de curl pour récupérer les adoucisseurs")
     curl_command = (
