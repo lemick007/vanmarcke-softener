@@ -47,6 +47,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         }
 
     # -- Nouvelle session pour la requête GET --
+    await asyncio.sleep(2)
     _LOGGER.debug("Création d'une nouvelle session pour récupérer les adoucisseurs")
     async with aiohttp.ClientSession() as get_session:
         try:
