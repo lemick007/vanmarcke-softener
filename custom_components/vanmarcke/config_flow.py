@@ -63,10 +63,10 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         "Client": headers.get("Client", "").strip(),
         "Uid": headers.get("Uid", "").strip(),
         "Token-Type": headers.get("Token-Type", "Bearer").strip(),
-        "Expiry": int(headers.get("Expiry", "0")),
-        'User-Agent': 'App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)',
-        'app_version': '3.5.1',
-        'language': 'en'
+        "Expiry": str(headers.get("Expiry", "0")),  # Conversion en string
+        "User-Agent": "App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)",
+        "App-Version": "3.5.1",  # Utiliser des tirets pour les noms d'en-tête
+        "Language": "en"
     }
     _LOGGER.debug("En-têtes : %s", auth_headers)
 
