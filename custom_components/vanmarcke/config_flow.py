@@ -51,10 +51,10 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     _LOGGER.debug("Exécution de curl pour récupérer les adoucisseurs")
     curl_command = (
         f'curl -s -X GET "{SOFTENERS_URL}" '
-        f'-H "Access-Token: {auth_headers["Access-Token"]}" '
-        f'-H "Client: {auth_headers["Client"]}" '
-        f'-H "Uid: {auth_headers["Uid"]}" '
-        f'-H "Token-Type: {auth_headers["Token-Type"]}"'
+        f'-H "Access-Token: {headers.get("Access-Token", "")}" '
+        f'-H "Client: {headers.get("Client", "")}" '
+        f'-H "Uid: {headers.get("Uid", "")}" '
+        f'-H "Token-Type: {headers.get("Token-Type", "Bearer")}"'
     )
     _LOGGER.debug("Commande curl: %s", curl_command)
     process = await asyncio.create_subprocess_shell(
