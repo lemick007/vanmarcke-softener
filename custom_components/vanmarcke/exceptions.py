@@ -1,5 +1,6 @@
+# exceptions.py
 class CannotConnect(Exception):
-    pass
+    """Impossible de se connecter à l'API Vanmarcke"""
 
 class InvalidAuth(Exception):
-    pass
+    """Identifiants invalides"""
