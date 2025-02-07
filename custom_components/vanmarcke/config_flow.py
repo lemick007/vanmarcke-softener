@@ -57,8 +57,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
         raise CannotConnect
 
-    #_LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s, Expiry=%s", 
-                  access_token, client, uid, token_type, expiry)
+    #_LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s, Expiry=%s", access_token, client, uid, token_type, expiry)
     auth_headers = {
         "Access-Token": headers.get("Access-Token", "").strip(),
         "Client": headers.get("Client", "").strip(),
