@@ -22,25 +22,26 @@ class ErieAPI:
         self._session = session  # Utilise la session fournie au lieu d'en créer une nouvelle
 
     async def authenticate(self):
-        try:
+        url = f"{self._base_url}/auth/sign_in"
+        data = {"email": self._username, "password": self._password}
+
+        try:  # <-- Correction de l'indentation ici
             async with async_timeout.timeout(10):
-                response = await self._session.post(
-                    f"{self._base_url}/auth/sign_in",
-                    json={"email": self._username, "password": self._password},
-                    headers={"User-Agent": "HomeAssistant"}
-                )
-                if response.status != 200:
-                    raise InvalidAuth(f"Erreur {response.status}")
-                
+                response = await self._session.post(url, json=data)
                 if response.status == 200:
-                    self._auth = {
+                    self._auth_headers = {
                         "Client": response.headers.get("Client"),
                         "Access-Token": response.headers.get("Access-Token"),
-                        "uid": response.headers.get("uid")
+                        "uid": response.headers.get("uid"),
                     }
                     return True
-        except aiohttp.ClientError as e:
-            raise CannotConnect(str(e))
+                elif response.status == 401:
+                    raise InvalidAuth("Invalid credentials")
+                else:
+                    raise CannotConnect(f"HTTP error {response.status}")
+        except aiohttp.ClientError as e:  # <-- Alignement correct
+            raise CannotConnect(f"Connection error: {e}")
+
 
     async def get_devices(self) -> list:
         """Récupération des appareils"""
