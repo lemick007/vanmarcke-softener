@@ -1,44 +1,29 @@
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.exceptions import ConfigEntryAuthFailed
-
-from .api import ErieAPI
 
 _LOGGER = logging.getLogger(__name__)
 
-class VanmarckeWaterCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, api: ErieAPI):
+class ErieWaterSoftenerCoordinator(DataUpdateCoordinator):
+    """Gère la récupération des données depuis l'API Erie."""
+
+    def __init__(self, hass, api):
+        """Initialise le coordinateur."""
+        self.api = api
         super().__init__(
             hass,
             _LOGGER,
-            name="Vanmarcke Water",
-            update_interval=timedelta(minutes=15),
+            name="erie_water_softener",
+            update_interval=timedelta(minutes=10),  # Mise à jour toutes les 10 minutes
         )
-        self.api = api
-        self.device_info = None
 
     async def _async_update_data(self):
+        """Récupère les données depuis l'API."""
         try:
             data = await self.api.get_full_data()
             if not data:
-                raise UpdateFailed("Empty data received from API")
-            
-            # Check for essential keys
-            required_keys = ["salt_level", "water_volume"]
-            for key in required_keys:
-                if key not in data:
-                    raise UpdateFailed(f"Missing key in data: {key}")
-            
-            if not self.device_info:
-                self.device_info = {
-                    "identifiers": {("vanmarcke_water", self.api._device_id)},
-                    "name": f"Vanmarcke Softener {self.api._device_id}",
-                    "manufacturer": "Vanmarcke",
-                    "model": "Erie Connect",
-                    "sw_version": data.get("software_version")
-                }
+                raise UpdateFailed("Aucune donnée reçue de l'API")
             return data
-        except Exception as e:
-            _LOGGER.error("Fatal error updating data: %s", str(e))
-            raise UpdateFailed(f"Error updating data: {str(e)}")
+        except Exception as err:
+            _LOGGER.error("Erreur lors de la mise à jour des données: %s", err)
+            raise UpdateFailed(err)

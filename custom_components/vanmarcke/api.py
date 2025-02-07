@@ -14,59 +14,34 @@ class ErieAPI:
         self._base_url = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1"
 
     async def authenticate(self) -> bool:
+        """Authentifie l'utilisateur et stocke les en-têtes nécessaires."""
         try:
             async with self._session.post(
                 f"{self._base_url}/auth/sign_in",
                 json={"email": self._email, "password": self._password}
             ) as response:
                 if response.status != 200:
-                    raise Exception(f"HTTP Error: {response.status}")
+                    _LOGGER.error(f"Échec de l'authentification: HTTP {response.status}")
+                    return False
                 
+                headers = response.headers
                 self._auth_headers = {
-                    "Access-Token": response.headers["Access-Token"],
-                    "Client": response.headers["Client"],
-                    "Uid": response.headers["Uid"]
+                    "Access-Token": headers.get("Access-Token"),
+                    "Client": headers.get("Client"),
+                    "Uid": headers.get("Uid"),
+                    "Token-Type": headers.get("Token-Type", "Bearer")
                 }
                 return True
-                
+
         except aiohttp.ClientError as e:
-            _LOGGER.error("Network error: %s", str(e))
-            raise
+            _LOGGER.error("Erreur réseau lors de l'authentification: %s", str(e))
+            return False
         except KeyError as e:
-            _LOGGER.error("Missing header: %s", str(e))
-            raise
-
-    async def get_full_data(self) -> Dict[str, Any]:
-        try:
-            device_id = await self._get_device_id()
-        except Exception as e:
-            _LOGGER.error("Unable to retrieve device ID: %s", str(e))
-            return {}
-
-        endpoints = {
-            "dashboard": f"water_softeners/{device_id}/dashboard",
-            "settings": f"water_softeners/{device_id}/settings",
-            "regenerations": f"water_softeners/{device_id}/regenerations",
-            "info": f"water_softeners/{device_id}/info"
-        }
-        
-        data = {}
-        for key, endpoint in endpoints.items():
-            try:
-                async with self._session.get(
-                    f"{self._base_url}/{endpoint}", 
-                    headers=self._auth_headers
-                ) as response:
-                    if response.status != 200:
-                        _LOGGER.error(f"Error fetching {key}: HTTP {response.status}")
-                        continue
-                    data[key] = await response.json()
-            except Exception as e:
-                _LOGGER.error("Error fetching %s: %s", key, str(e))
-        
-        return self._parse_data(data)
+            _LOGGER.error("En-tête manquant lors de l'authentification: %s", str(e))
+            return False
 
     async def _get_device_id(self) -> str:
+        """Récupère l'ID du premier adoucisseur d'eau."""
         if not self._device_id:
             try:
                 async with self._session.get(
@@ -74,45 +49,71 @@ class ErieAPI:
                     headers=self._auth_headers
                 ) as response:
                     if response.status != 200:
-                        raise Exception(f"HTTP error {response.status}")
+                        _LOGGER.error("Échec de récupération du device_id: HTTP %s", response.status)
+                        return None
                     
-                    devices = await response.json()
-                    if not devices or not isinstance(devices, list):
-                        raise ValueError("No devices found")
-                    
-                    self._device_id = devices[0]["profile"]["id"]
+                    data = await response.json()
+                    if isinstance(data, list) and data:
+                        self._device_id = data[0]["profile"]["id"]
+                    else:
+                        _LOGGER.warning("Aucun adoucisseur trouvé")
+                        return None
             except Exception as e:
-                _LOGGER.error("Error retrieving device ID: %s", str(e))
-                raise
+                _LOGGER.error("Erreur lors de la récupération du device_id: %s", str(e))
+                return None
+        
         return self._device_id
 
-    def _parse_data(self, raw_data: Dict) -> Dict:
-        parsed = {}
-        try:
-            # Dashboard data
-            dashboard = raw_data.get("dashboard", {}).get("status", {})
-            parsed.update({
-                "salt_level": dashboard.get("percentage"),
-                "water_volume": dashboard.get("extra", "0 L").split()[0],
-                "days_remaining": dashboard.get("days_remaining")
-            })
-            
-            # Settings
-            settings = raw_data.get("settings", {}).get("settings", {})
-            parsed["water_hardness"] = settings.get("install_hardness")
-            
-            # Last regeneration
-            regenerations = raw_data.get("regenerations", [])
-            if regenerations:
-                parsed["last_regeneration"] = regenerations[0].get("datetime")
-                parsed["salt_used"] = regenerations[0].get("salt_used")
-            
-            # Device info
-            info = raw_data.get("info", {})
-            parsed["total_volume"] = info.get("total_volume", "0 L").split()[0]
-            parsed["software_version"] = info.get("software")
-            
-        except Exception as e:
-            _LOGGER.error("Error parsing data: %s", str(e))
+    async def get_full_data(self) -> Dict[str, Any]:
+        """Récupère toutes les données pertinentes de l'adoucisseur."""
+        device_id = await self._get_device_id()
+        if not device_id:
+            return {}
+
+        endpoints = {
+            "dashboard": f"water_softeners/{device_id}/dashboard",
+            "settings": f"water_softeners/{device_id}/settings",
+            "regenerations": f"water_softeners/{device_id}/regenerations",
+            "info": f"water_softeners/{device_id}/info",
+            "flow": f"water_softeners/{device_id}/flow"
+        }
         
-        return parsed
+        data = {}
+        for key, endpoint in endpoints.items():
+            try:
+                async with self._session.get(
+                    f"{self._base_url}/{endpoint}",
+                    headers=self._auth_headers
+                ) as response:
+                    if response.status == 200:
+                        data[key] = await response.json()
+                    else:
+                        _LOGGER.error(f"Erreur {response.status} en récupérant {key}")
+            except Exception as e:
+                _LOGGER.error("Erreur en récupérant %s: %s", key, str(e))
+        
+        return self._parse_data(data)
+
+    def _parse_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transforme les données brutes en données exploitables."""
+        if not data:
+            return {}
+
+        try:
+            dashboard = data.get("dashboard", {})
+            info = data.get("info", {})
+            settings = data.get("settings", {})
+            flow = data.get("flow", {})
+
+            return {
+                "salt_level": dashboard.get("status", {}).get("percentage"),
+                "water_volume": dashboard.get("status", {}).get("extra"),
+                "days_remaining": dashboard.get("status", {}).get("days_remaining"),
+                "last_regeneration": info.get("last_regeneration"),
+                "total_volume": info.get("total_volume"),
+                "software_version": info.get("software"),
+                "flow": flow.get("flow")
+            }
+        except Exception as e:
+            _LOGGER.error("Erreur lors du parsing des données: %s", str(e))
+            return {}
