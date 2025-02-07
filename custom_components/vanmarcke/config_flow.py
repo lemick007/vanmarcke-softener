@@ -5,7 +5,7 @@ import voluptuous as vol
 from homeassistant.util.dt import utcnow
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
@@ -30,7 +30,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     
     Ce code reprend la logique de ton script test, mais **n'envoie pas le header "Token-Type"** lors de la requête GET.
     """
-    session = async_create_clientsession(hass)
+    session = async_get_clientsession(hass)
 
 
     _LOGGER.debug("Tentative d'authentification pour %s", email)
@@ -51,35 +51,25 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     client = headers.get("Client")
     uid = headers.get("Uid")
     token_type = headers.get("Token-Type", "Bearer")
-    server_time = int(headers.get("Expiry", "0"))
-    client_time = int(utcnow().timestamp())
+    expiry = int(headers.get("Expiry", "0"))
 
     if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
         raise CannotConnect
 
-    _LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s",
-                  access_token, client, uid, token_type)
+    _LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s, Expiry=%s", 
+                  access_token, client, uid, token_type, expiry)
     auth_headers = {
         "Access-Token": headers.get("Access-Token", "").strip(),
         "Client": headers.get("Client", "").strip(),
         "Uid": headers.get("Uid", "").strip(),
         "Token-Type": headers.get("Token-Type", "Bearer").strip(),
-        "Expiry": str(server_time),  # Utilisé comme Server-Time
-        "Client-Time": str(client_time),
-        "Connection": "close"
+        "Expiry": int(headers.get("Expiry", "0")),
+        'User-Agent': 'App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)',
+        'app_version': '3.5.1',
+        'language': 'en'
     }
     _LOGGER.debug("En-têtes : %s", auth_headers)
-
-    server_time = int(response.headers.get("Server-Time", "0"))
-    if server_time == 0:
-        raise ValueError("Server-Time manquant dans les headers")
-
-    client_time = int(utcnow().timestamp())
-    if abs(client_time - server_time) > 300:  # 5 min de marge
-        _LOGGER.error("Désynchronisation temporelle serveur/client: %s vs %s", 
-                    server_time, client_time)
-        raise CannotConnect
 
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
     try:
