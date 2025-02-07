@@ -7,6 +7,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .const import DOMAIN
 
@@ -40,21 +41,27 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         raise InvalidAuth
     
     headers = response.headers
+    
     auth_headers = {
         "Access-Token": headers.get("Access-Token", ""),
         "Client": headers.get("Client", ""),
         "Uid": headers.get("Uid", ""),
         "Token-Type": headers.get("Token-Type", "Bearer"),
-        "Expiry": headers.get("Expiry", "0"),
-        "User-Agent": "App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)",
-        "App-Version": "3.5.1",
-        "Language": "en"
+        #"Expiry": headers.get("Expiry", "0"),
+        #"User-Agent": "App/3.5.1 (iPhone; iOS 15.1.1; Scale/2.0.0)",
+        #"App-Version": "3.5.1",
+        #"Language": "en"
     }
     _LOGGER.debug("En-têtes : %s", auth_headers)
 
     _LOGGER.debug("Tentative de récupération des adoucisseurs")
+    session2 = async_create_clientsession(
+        hass,
+        headers={},  # Désactive les headers par défaut de HA
+        auto_cleanup=False
+    )
     try:
-        response = await session.get(SOFTENERS_URL, headers=auth_headers)
+        response = await session2.get(SOFTENERS_URL, headers=auth_headers)
     except aiohttp.ClientError as err:
         _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
         raise CannotConnect from err
