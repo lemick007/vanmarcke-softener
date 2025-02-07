@@ -1,5 +1,6 @@
 import logging
 import aiohttp
+import time
 import voluptuous as vol
 
 from homeassistant import config_entries
