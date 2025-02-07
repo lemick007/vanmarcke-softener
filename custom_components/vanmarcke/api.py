@@ -25,23 +25,30 @@ class ErieAPI:
         url = f"{self._base_url}/auth/sign_in"
         data = {"email": self._username, "password": self._password}
 
-        try:  # <-- Correction de l'indentation ici
+        try:
             async with async_timeout.timeout(10):
-                response = await self._session.post(url, json=data)
-                if response.status == 200:
-                    self._auth_headers = {
-                        "Client": response.headers.get("Client"),
-                        "Access-Token": response.headers.get("Access-Token"),
-                        "uid": response.headers.get("uid"),
-                    }
-                    return True
-                elif response.status == 401:
-                    raise InvalidAuth("Invalid credentials")
-                else:
-                    raise CannotConnect(f"HTTP error {response.status}")
-        except aiohttp.ClientError as e:  # <-- Alignement correct
-            raise CannotConnect(f"Connection error: {e}")
+                async with self._session.post(url, json=data) as response:
+                    print("Status:", response.status)
+                    print("Headers:", response.headers)  # DEBUG
+                    print("Body:", await response.text())  # DEBUG
 
+                    if response.status == 200:
+                        # Récupérer les en-têtes d'authentification
+                        self._auth = {
+                            "Access-Token": response.headers.get("Access-Token"),
+                            "Client": response.headers.get("Client"),
+                            "Uid": response.headers.get("Uid"),
+                            "Token-Type": response.headers.get("Token-Type"),
+                        }
+                        return True  # Auth réussie
+                    
+                    elif response.status == 401:
+                        raise InvalidAuth("Invalid credentials")
+                    else:
+                        raise CannotConnect(f"HTTP error {response.status}")
+
+        except aiohttp.ClientError as e:
+            raise CannotConnect(f"Connection error: {e}")
 
     async def get_devices(self) -> list:
         """Récupération des appareils"""
