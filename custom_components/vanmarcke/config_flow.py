@@ -48,7 +48,7 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     access_token = headers.get("Access-Token")
     client = headers.get("Client")
     uid = headers.get("Uid")
-    token_type = headers.get("Token-Type", "Bearer")  # normalement "Bearer"
+    token_type = "Bearer"
 
     if not access_token or not client or not uid or not token_type:
         _LOGGER.error("Les en-têtes d'authentification sont incomplets: %s", headers)
@@ -57,11 +57,11 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
     _LOGGER.debug("En-têtes reçus: Access-Token=%s, Client=%s, Uid=%s, Token-Type=%s",
                   access_token, client, uid, token_type)
 
-    # Pour la requête GET, on **n'enverra PAS** le header "Token-Type"
     auth_headers = {
         "Access-Token": access_token.strip(),
         "Client": client.strip(),
         "Uid": uid.strip(),
+        "Token-Type": token_type.strip(),"
     }
     _LOGGER.debug("En-têtes d'authentification utilisés pour la suite (sans Token-Type): %s", auth_headers)
 
