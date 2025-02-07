@@ -11,44 +11,34 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# URL d'authentification et récupération des adoucisseurs (d'après ton script test)
 AUTH_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/auth/sign_in"
 SOFTENERS_URL = "https://connectmysoftenerapi.pentair.eu/api/erieapp/v1/water_softeners"
 
-
-# Exceptions personnalisées pour le flux de configuration
 class CannotConnect(HomeAssistantError):
     """Erreur de connexion à l'API."""
-
 
 class InvalidAuth(HomeAssistantError):
     """Identifiants invalides."""
 
-
 class NoSoftenerFound(HomeAssistantError):
     """Aucun adoucisseur trouvé pour cet utilisateur."""
 
-
 async def async_authenticate(hass: HomeAssistant, email: str, password: str):
-    """
-    Tente de s'authentifier auprès de l'API et récupère l'ID du premier adoucisseur.
-    
-    Renvoie un tuple (auth_headers, softener_id) si la connexion réussit.
-    """
+    """Tente de s'authentifier auprès de l'API et récupère l'ID du premier adoucisseur."""
     session = async_get_clientsession(hass)
 
-    # Première étape : authentification
+    _LOGGER.debug("Tentative d'authentification pour %s", email)
     try:
         response = await session.post(AUTH_URL, json={"email": email, "password": password})
     except aiohttp.ClientError as err:
         _LOGGER.error("Erreur de connexion lors de l'authentification: %s", err)
         raise CannotConnect from err
 
+    _LOGGER.debug("Réponse de l'authentification: %s", response.status)
     if response.status != 200:
         _LOGGER.error("Échec de l'authentification, statut %s", response.status)
         raise InvalidAuth
 
-    # Récupération des en-têtes d'authentification
     headers = response.headers
     auth_headers = {
         "Access-Token": headers.get("Access-Token"),
@@ -56,16 +46,20 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         "Uid": headers.get("Uid"),
         "Token-Type": headers.get("Token-Type"),
     }
+    _LOGGER.debug("En-têtes d'authentification récupérés: %s", auth_headers)
 
-    # Seconde étape : récupération de l'adoucisseur
+    _LOGGER.debug("Tentative de récupération des adoucisseurs")
     try:
         response = await session.get(SOFTENERS_URL, headers=auth_headers)
     except aiohttp.ClientError as err:
         _LOGGER.error("Erreur lors de la récupération des adoucisseurs: %s", err)
         raise CannotConnect from err
 
+    _LOGGER.debug("Réponse GET water_softeners: %s", response.status)
     if response.status != 200:
+        text = await response.text()
         _LOGGER.error("Impossible de récupérer les adoucisseurs, statut %s", response.status)
+        _LOGGER.debug("Réponse du serveur: %s", text)
         raise CannotConnect
 
     try:
@@ -74,14 +68,14 @@ async def async_authenticate(hass: HomeAssistant, email: str, password: str):
         _LOGGER.error("Erreur lors du décodage de la réponse JSON: %s", err)
         raise CannotConnect from err
 
+    _LOGGER.debug("Données reçues: %s", data)
     if not data or not isinstance(data, list) or len(data) == 0:
         _LOGGER.error("Aucun adoucisseur trouvé pour cet utilisateur.")
         raise NoSoftenerFound
 
-    # On récupère l'ID du premier adoucisseur
     softener_id = data[0]["profile"]["id"]
+    _LOGGER.debug("ID de l'adoucisseur récupéré: %s", softener_id)
     return auth_headers, softener_id
-
 
 class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Gère le flux de configuration pour l'intégration Vanmarcke Water Softener."""
@@ -103,7 +97,7 @@ class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     data={
                         "email": email,
                         "password": password,
-                        "auth_headers": dict(auth_headers),  # Conversion au format dict si besoin
+                        "auth_headers": dict(auth_headers),
                         "softener_id": softener_id,
                     },
                 )
@@ -117,7 +111,6 @@ class VanmarckeWaterFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Erreur inattendue: %s", err)
                 errors["base"] = "unknown"
 
-        # Schéma de validation du formulaire de configuration
         schema = vol.Schema({
             vol.Required("email"): str,
             vol.Required("password"): str,
