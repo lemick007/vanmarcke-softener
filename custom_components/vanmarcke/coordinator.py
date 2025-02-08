@@ -21,7 +21,7 @@ class VanmarckeWaterCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="Vanmarcke Water Softener",
-            update_interval=timedelta(minutes=15),
+            update_interval=timedelta(minutes=5),
         )
         self.device_info = None
 
