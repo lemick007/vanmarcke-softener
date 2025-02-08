@@ -22,7 +22,7 @@ Ce projet **n'est pas affilié** à Van Marcke ou Pentair. Développé par un pa
   - Version du logiciel
   - Volume total traité
 
-![Exemple de dashboard](https://github.com.com/lemick007/vanmarcke-softener/preview.png) *Interface indicative*
+![Exemple de dashboard]([https://github.com.com/lemick007/vanmarcke-softener/preview.png](https://raw.githubusercontent.com/lemick007/vanmarcke-softener/refs/heads/main/preview.png)) *Interface indicative*
 
 ## Installation via HACS
 1. Installer [HACS](https://hacs.xyz/) si ce n'est pas déjà fait
