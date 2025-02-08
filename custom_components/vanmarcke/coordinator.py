@@ -31,7 +31,7 @@ class VanmarckeWaterCoordinator(DataUpdateCoordinator):
             # Vérifier si on a encore les en-têtes d'authentification valides
             missing_headers = [h for h in ["Access-Token", "Client", "Uid", "Token-Type"] if not self.api._auth_headers.get(h)]
             if missing_headers:
-                _LOGGER.warning("En-têtes d'authentification manquants: %s. Tentative de reconnexion...", missing_headers)
+                _LOGGER.debug("En-têtes d'authentification manquants: %s. Tentative de reconnexion...", missing_headers)
                 auth_success = await self.api.authenticate()
                 if not auth_success:
                     raise UpdateFailed("Échec de la ré-authentification. Impossible de récupérer les données.")
