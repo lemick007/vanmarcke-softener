@@ -33,6 +33,7 @@ Catégorie : Intégration
 3. Redémarrer Home Assistant
 4. Ajouter via `Configuration > Appareils & Services > + Ajouter une intégration`
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=lemick007&repository=vanmarcke-softener&category=Integrations)
 ## Pré-requis
 Il faut avoir installé l'application de votre adoucisseur (connectmysoftener ou autre) pour avoir un compte, et le connecter au wi-fi !
 
