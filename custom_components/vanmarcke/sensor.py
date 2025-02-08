@@ -13,9 +13,11 @@ SENSOR_TYPES = {
     "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water"],
     "days_remaining": ["Jours restants avant régénération", "jours", "mdi:calendar"],
     "last_regeneration": ["Dernière régénération", None, "mdi:history"],
+    "nr_regenerations": ["Nombre de régénérations", None, "mdi:counter"],
     "total_volume": ["Volume total traité", UnitOfVolume.LITERS, "mdi:chart-bar"],
     "software_version": ["Version du logiciel", None, "mdi:information-outline"],
     "flow": ["Débit d'eau", FLOW_LITERS_PER_MINUTE, "mdi:water-pump"],
+    "daily_consumption": ["Consommation journalière", UnitOfVolume.LITERS, "mdi:counter"],
 }
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -33,6 +35,8 @@ class ErieSensor(CoordinatorEntity, SensorEntity):
         self._attr_name = SENSOR_TYPES[sensor_type][0]
         self._attr_icon = SENSOR_TYPES[sensor_type][2]
         self._attr_native_unit_of_measurement = SENSOR_TYPES[sensor_type][1]
+        if coordinator.device_info:
+            self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self):

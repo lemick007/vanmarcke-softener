@@ -36,17 +36,17 @@ class VanmarckeWaterCoordinator(DataUpdateCoordinator):
                 if not auth_success:
                     raise UpdateFailed("Échec de la ré-authentification. Impossible de récupérer les données.")
             
-            # Récupération des données
+            # Récupération des données via l'API
             data = await self.api.get_full_data()
             if not data:
                 raise UpdateFailed("Aucune donnée reçue de l'API.")
             
-            # Vérification des données essentielles
+            # Vérifier la présence des clés essentielles
             for key in ["salt_level", "water_volume"]:
                 if key not in data:
                     raise UpdateFailed(f"Clé manquante dans les données: {key}")
             
-            # Initialisation des informations du dispositif si nécessaire
+            # Initialisation des informations du dispositif pour l'affichage dans HA
             if not self.device_info:
                 self.device_info = {
                     "identifiers": {("vanmarcke_water", self.api._device_id)},

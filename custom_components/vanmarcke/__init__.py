@@ -19,15 +19,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         password=entry.data["password"],
         session=session,
     )
-    # Assigner le device_id choisi par l'utilisateur
+    # Assigner le device_id choisi par l'utilisateur (lors de la config_flow)
     api._device_id = entry.data["device_id"]
+
     coordinator = VanmarckeWaterCoordinator(hass, api)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Attendre l'importation de la plateforme sensor
+    # Forward the sensor platforms (await added)
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     return True
 
