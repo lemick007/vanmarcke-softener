@@ -9,7 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 
 SENSOR_TYPES = {
-    "salt_level": ["Niveau de sel", PERCENTAGE, "mdi:shaker-outline"],
+    "salt_level": ["Capacité restante", PERCENTAGE, "mdi:shaker-outline"],
     "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water"],
     "days_remaining": ["Jours restants avant régénération", "jours", "mdi:calendar"],
     "last_regeneration": ["Dernière régénération", None, "mdi:history"],
