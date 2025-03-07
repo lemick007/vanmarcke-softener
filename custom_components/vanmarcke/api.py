@@ -1,6 +1,7 @@
 from typing import Any, Dict
 import logging
 from .curl_wrapper import async_curl_get, CannotConnect
+from datetime import date
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,12 +65,13 @@ class ErieAPI:
         if not device_id:
             return {}
         # Définir les endpoints : on inclut désormais "graph" et on se passe de "regenerations"
+        today = date.today()
         endpoints = {
             "dashboard": f"water_softeners/{device_id}/dashboard",
             "settings": f"water_softeners/{device_id}/settings",
             "info": f"water_softeners/{device_id}/info",
             "flow": f"water_softeners/{device_id}/flow",
-            "graph": f"water_softeners/{device_id}/graphs/day"  # Par exemple, pour un graphe journalier
+            "graph": f"water_softeners/{device_id}/graphs/day?day={today.day}&month={today.month}&year={today.year}" #set todays date
         }
         data = {}
         for key, endpoint in endpoints.items():
