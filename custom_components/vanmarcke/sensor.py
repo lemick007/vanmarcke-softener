@@ -15,7 +15,7 @@ SENSOR_TYPES = {
     "last_regeneration": ["Dernière régénération", None, "mdi:history", None],
     "nr_regenerations": ["Nombre de régénérations", None, "mdi:counter", None],
     "total_volume": ["Volume total traité", UnitOfVolume.LITERS, "mdi:chart-bar", "water"],
-    "software_version": ["Version du logiciel", None, "mdi:information-outline", None],,
+    "software_version": ["Version du logiciel", None, "mdi:information-outline", None],
     "flow": ["Débit d'eau", FLOW_LITERS_PER_MINUTE, "mdi:water-pump", None],
     "daily_consumption": ["Consommation journalière", UnitOfVolume.LITERS, "mdi:counter", "water"],
 }
