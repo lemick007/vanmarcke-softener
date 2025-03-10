@@ -9,16 +9,18 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 
-# SENSOR_TYPES : [nom, unité, icône, device_class optionnel]
+# SENSOR_TYPES: [Nom, Unité, Icône, Device_class optionnel]
 SENSOR_TYPES = {
     "salt_level": ["Capacité restante", PERCENTAGE, "mdi:shaker-outline", None],
     "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water", None],
     "days_remaining": ["Jours restants avant régénération", "jours", "mdi:calendar", None],
     "last_regeneration": ["Dernière régénération", None, "mdi:history", None],
     "nr_regenerations": ["Nombre de régénérations", None, "mdi:counter", None],
+    # Pour les capteurs cumulés, le device_class "water" est requis et la state_class doit être "total"
     "total_volume": ["Volume total traité", UnitOfVolume.LITERS, "mdi:chart-bar", "water"],
     "software_version": ["Version du logiciel", None, "mdi:information-outline", None],
     "flow": ["Débit d'eau", FLOW_LITERS_PER_MINUTE, "mdi:water-pump", None],
+    # Pour la consommation journalière, on souhaite un cumul qui se réinitialise chaque jour
     "daily_consumption": ["Consommation journalière", UnitOfVolume.LITERS, "mdi:counter", "water"],
 }
 
@@ -37,14 +39,13 @@ class ErieSensor(CoordinatorEntity, SensorEntity):
         self._attr_name = SENSOR_TYPES[sensor_type][0]
         self._attr_icon = SENSOR_TYPES[sensor_type][2]
         self._attr_native_unit_of_measurement = SENSOR_TYPES[sensor_type][1]
-        # Si un device_class est défini dans le dictionnaire, on l'assigne
+        # Si un device_class est défini, on l'assigne
         if SENSOR_TYPES[sensor_type][3]:
             self._attr_device_class = SENSOR_TYPES[sensor_type][3]
-        # Pour les capteurs destinés à être utilisés dans Energy, on définit state_class "measurement"
-        # et last_reset au début du jour (à adapter selon vos besoins)
+        # Pour les capteurs cumulés (total_volume et daily_consumption), définir state_class "total" et last_reset
         if sensor_type in ["total_volume", "daily_consumption"]:
-            self._attr_state_class = "measurement"
-            # Last_reset est fixé à minuit du jour courant
+            self._attr_state_class = "total"
+            # Définir last_reset au début du jour courant
             self._attr_last_reset = datetime.combine(datetime.now().date(), time())
         if coordinator.device_info:
             self._attr_device_info = coordinator.device_info
