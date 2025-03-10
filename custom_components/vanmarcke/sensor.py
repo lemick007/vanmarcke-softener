@@ -31,14 +31,15 @@ class ErieSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, sensor_type):
         """Initialise le capteur."""
         super().__init__(coordinator)
+        self._sensor_type = sensor_type
         self._attr_name = SENSOR_TYPES[sensor_type][0]
         self._attr_icon = SENSOR_TYPES[sensor_type][2]
         self._attr_native_unit_of_measurement = SENSOR_TYPES[sensor_type][1]
-        # Si un device_class est défini, on l'assigne
         if SENSOR_TYPES[sensor_type][3]:
             self._attr_device_class = SENSOR_TYPES[sensor_type][3]
         if coordinator.device_info:
             self._attr_device_info = coordinator.device_info
+
 
     @property
     def native_value(self):
