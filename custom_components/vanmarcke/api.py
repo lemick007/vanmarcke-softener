@@ -94,12 +94,16 @@ class ErieAPI:
             # Flow
             flow = raw_data.get("flow", {})
             # Graph (pour la consommation journalière)
-            graph_data = raw_data.get("graph", {})
-            if isinstance(graph_data, list):
-                daily_consumption = sum(item.get("y", 0) for item in graph_data)
+            graph_obj = raw_data.get("graph", {})
+            if isinstance(graph_obj, dict):
+                graph_data = graph_obj.get("graph", [])
+            elif isinstance(graph_obj, list):
+                graph_data = graph_obj
             else:
-                daily_consumption = 0
-
+                graph_data = []
+            # Convertir les valeurs "y" en int pour la somme
+            daily_consumption = sum(int(item.get("y", 0)) for item in graph_data)
+            
             parsed.update({
                 "salt_level": dashboard.get("percentage"),
                 "water_volume": dashboard.get("extra", "0 L").split()[0],
