@@ -1,3 +1,4 @@
+from datetime import datetime, time
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import PERCENTAGE
 from homeassistant.util.unit_conversion import UnitOfVolume  # Pour UnitOfVolume.LITERS
@@ -8,6 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 
+# SENSOR_TYPES : [nom, unité, icône, device_class optionnel]
 SENSOR_TYPES = {
     "salt_level": ["Capacité restante", PERCENTAGE, "mdi:shaker-outline", None],
     "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water", None],
@@ -35,11 +37,17 @@ class ErieSensor(CoordinatorEntity, SensorEntity):
         self._attr_name = SENSOR_TYPES[sensor_type][0]
         self._attr_icon = SENSOR_TYPES[sensor_type][2]
         self._attr_native_unit_of_measurement = SENSOR_TYPES[sensor_type][1]
+        # Si un device_class est défini dans le dictionnaire, on l'assigne
         if SENSOR_TYPES[sensor_type][3]:
             self._attr_device_class = SENSOR_TYPES[sensor_type][3]
+        # Pour les capteurs destinés à être utilisés dans Energy, on définit state_class "measurement"
+        # et last_reset au début du jour (à adapter selon vos besoins)
+        if sensor_type in ["total_volume", "daily_consumption"]:
+            self._attr_state_class = "measurement"
+            # Last_reset est fixé à minuit du jour courant
+            self._attr_last_reset = datetime.combine(datetime.now().date(), time())
         if coordinator.device_info:
             self._attr_device_info = coordinator.device_info
-
 
     @property
     def native_value(self):
