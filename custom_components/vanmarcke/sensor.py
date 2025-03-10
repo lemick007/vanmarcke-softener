@@ -9,15 +9,15 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 
 SENSOR_TYPES = {
-    "salt_level": ["Capacité restante", PERCENTAGE, "mdi:shaker-outline"],
-    "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water"],
-    "days_remaining": ["Jours restants avant régénération", "jours", "mdi:calendar"],
-    "last_regeneration": ["Dernière régénération", None, "mdi:history"],
-    "nr_regenerations": ["Nombre de régénérations", None, "mdi:counter"],
-    "total_volume": ["Volume total traité", UnitOfVolume.LITERS, "mdi:chart-bar"],
-    "software_version": ["Version du logiciel", None, "mdi:information-outline"],
-    "flow": ["Débit d'eau", FLOW_LITERS_PER_MINUTE, "mdi:water-pump"],
-    "daily_consumption": ["Consommation journalière", UnitOfVolume.LITERS, "mdi:counter"],
+    "salt_level": ["Capacité restante", PERCENTAGE, "mdi:shaker-outline", None],
+    "water_volume": ["Volume d'eau restant", UnitOfVolume.LITERS, "mdi:water", None],
+    "days_remaining": ["Jours restants avant régénération", "jours", "mdi:calendar", None],
+    "last_regeneration": ["Dernière régénération", None, "mdi:history", None],
+    "nr_regenerations": ["Nombre de régénérations", None, "mdi:counter", None],
+    "total_volume": ["Volume total traité", UnitOfVolume.LITERS, "mdi:chart-bar", "water"],
+    "software_version": ["Version du logiciel", None, "mdi:information-outline", None],,
+    "flow": ["Débit d'eau", FLOW_LITERS_PER_MINUTE, "mdi:water-pump", None],
+    "daily_consumption": ["Consommation journalière", UnitOfVolume.LITERS, "mdi:counter", "water"],
 }
 
 async def async_setup_entry(hass, entry, async_add_entities):
