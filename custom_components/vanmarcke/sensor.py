@@ -53,7 +53,11 @@ class ErieSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Retourne la valeur actuelle du capteur."""
-        return self.coordinator.data.get(self._sensor_type)
+        current_value = self.coordinator.data.get(self._sensor_type)
+    
+        if self._sensor_type == "total_volume" and current_value is not None and current_value == 0:
+            return None  # Ignore les valeurs "0" pour total_volume
+        return current_value
 
     @property
     def unique_id(self):
