@@ -84,55 +84,60 @@ class ErieAPI:
         return self._parse_data(data)
 
     def _parse_data(self, raw_data: Dict) -> Dict:
-        parsed = {}
+    parsed = {}
+    try:
+        # Dashboard
+        dashboard = raw_data.get("dashboard", {}).get("status", {})
+        # Info (contient last_regeneration et nr_regenerations et total_volume)
+        info = raw_data.get("info", {})
+        # Settings
+        settings = raw_data.get("settings", {}).get("settings", {})
+        # Flow
+        flow = raw_data.get("flow", {})
+        # Graph (pour la consommation journalière)
+        graph_obj = raw_data.get("graph", {})
+
+        # Calcul de la consommation journalière brute depuis le graph
+        if isinstance(graph_obj, dict):
+            graph_data = graph_obj.get("graph", [])
+        elif isinstance(graph_obj, list):
+            graph_data = graph_obj
+        else:
+            graph_data = []
+        daily_raw = sum(int(item.get("y", 0)) for item in graph_data)
+
+        # Récupération du volume total traité pour servir de plafond
+        total_vol = 0
         try:
-            # Dashboard
-            dashboard = raw_data.get("dashboard", {}).get("status", {})
-            # Info (contient last_regeneration et nr_regenerations et total_volume)
-            info = raw_data.get("info", {})
-            # Settings
-            settings = raw_data.get("settings", {}).get("settings", {})
-            # Flow
-            flow = raw_data.get("flow", {})
-            # Graph (pour la consommation journalière)
-            graph_obj = raw_data.get("graph", {})
-
-            # Calcul de la consommation journalière brute depuis le graph
-            if isinstance(graph_obj, dict):
-                graph_data = graph_obj.get("graph", [])
-            elif isinstance(graph_obj, list):
-                graph_data = graph_obj
-            else:
-                graph_data = []
-            daily_raw = sum(int(item.get("y", 0)) for item in graph_data)
-
-            # Récupération du volume total traité pour servir de plafond
+            total_vol = int(info.get("total_volume", "0").split()[0])
+        except Exception:
             total_vol = 0
-            try:
-                total_vol = int(info.get("total_volume", "0").split()[0])
-            except Exception:
-                total_vol = 0
 
-            # Clamp : si négatif ou > MAX_DAILY_CONSUMPTION, on remet à zéro
-            if daily_raw < 0 or daily_raw > MAX_DAILY_CONSUMPTION:
-                # _LOGGER.warning("Conso journalière aberrante (%s L), remise à 0", daily_raw)
-                daily_consumption = 0
-            else:
-                daily_consumption = daily_raw
-            
-            parsed.update({
-                "salt_level": dashboard.get("percentage"),
-                "water_volume": dashboard.get("extra", "0 L").split()[0],
-                "days_remaining": dashboard.get("days_remaining"),
-                # Utilisation des informations issues de "info"
-                "last_regeneration": info.get("last_regeneration"),
-                "nr_regenerations": info.get("nr_regenerations"),
-                "total_volume": info.get("total_volume", "0 L").split()[0],
-                "software_version": info.get("software"),
-                "flow": flow.get("flow"),
-                "daily_consumption": daily_consumption,
-            })
-            # Ajout d'une information supplémentaire si nécessaire
-        except Exception as e:
-            _LOGGER.error("Erreur lors du parsing des données: %s", str(e))
-        return parsed
+        # Clamp : si négatif ou > MAX_DAILY_CONSUMPTION, on remet à zéro
+        if daily_raw < 0 or daily_raw > MAX_DAILY_CONSUMPTION:
+            _LOGGER.warning("Conso journalière aberrante (%s L), remise à 0", daily_raw)
+            daily_consumption = 0
+        else:
+            daily_consumption = daily_raw
+        
+        # Empêcher l'ajout de la consommation totale traitée lors d'un reboot
+        if daily_consumption == 0 and total_vol > 0:
+            # Ne pas ajouter le total_volume si c'est un reboot (on considère que ce volume ne doit pas être compté)
+            _LOGGER.info("Reboot détecté, la consommation totale n'est pas ajoutée.")
+            daily_consumption = 0
+
+        parsed.update({
+            "salt_level": dashboard.get("percentage"),
+            "water_volume": dashboard.get("extra", "0 L").split()[0],
+            "days_remaining": dashboard.get("days_remaining"),
+            # Utilisation des informations issues de "info"
+            "last_regeneration": info.get("last_regeneration"),
+            "nr_regenerations": info.get("nr_regenerations"),
+            "total_volume": info.get("total_volume", "0 L").split()[0],
+            "software_version": info.get("software"),
+            "flow": flow.get("flow"),
+            "daily_consumption": daily_consumption,
+        })
+    except Exception as e:
+        _LOGGER.error("Erreur lors du parsing des données: %s", str(e))
+    return parsed
