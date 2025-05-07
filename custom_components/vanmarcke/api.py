@@ -3,6 +3,7 @@ import logging
 from .curl_wrapper import async_curl_get, CannotConnect
 from datetime import date
 
+MAX_DAILY_CONSUMPTION = 1000  # litres (évite les valeurs aberrentes)
 _LOGGER = logging.getLogger(__name__)
 
 class ErieAPI:
@@ -95,14 +96,29 @@ class ErieAPI:
             flow = raw_data.get("flow", {})
             # Graph (pour la consommation journalière)
             graph_obj = raw_data.get("graph", {})
+
+            # Calcul de la consommation journalière brute depuis le graph
             if isinstance(graph_obj, dict):
                 graph_data = graph_obj.get("graph", [])
             elif isinstance(graph_obj, list):
                 graph_data = graph_obj
             else:
                 graph_data = []
-            # Convertir les valeurs "y" en int pour la somme
-            daily_consumption = sum(int(item.get("y", 0)) for item in graph_data)
+            daily_raw = sum(int(item.get("y", 0)) for item in graph_data)
+
+            # Récupération du volume total traité pour servir de plafond
+            total_vol = 0
+            try:
+                total_vol = int(info.get("total_volume", "0").split()[0])
+            except Exception:
+                total_vol = 0
+
+            # Clamp : si négatif ou > MAX_DAILY_CONSUMPTION, on remet à zéro
+            if daily_raw < 0 or daily_raw > MAX_DAILY_CONSUMPTION:
+                # _LOGGER.warning("Conso journalière aberrante (%s L), remise à 0", daily_raw)
+                daily_consumption = 0
+            else:
+                daily_consumption = daily_raw
             
             parsed.update({
                 "salt_level": dashboard.get("percentage"),
