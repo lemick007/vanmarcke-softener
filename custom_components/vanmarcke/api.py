@@ -83,7 +83,7 @@ class ErieAPI:
                 _LOGGER.error("Erreur en récupérant %s: %s", key, str(e))
         return self._parse_data(data)
 
-    def _parse_data(self, raw_data: Dict) -> Dict:
+def _parse_data(self, raw_data: Dict) -> Dict:
     parsed = {}
     try:
         # Dashboard
@@ -113,18 +113,19 @@ class ErieAPI:
         except Exception:
             total_vol = 0
 
-        # Clamp : si négatif ou > MAX_DAILY_CONSUMPTION, on remet à zéro
-        if daily_raw < 0 or daily_raw > MAX_DAILY_CONSUMPTION:
+        # Vérification de la consommation journalière
+        if daily_raw > MAX_DAILY_CONSUMPTION:
+            # Si la consommation dépasse le seuil MAX_DAILY_CONSUMPTION, on la remet à zéro
             _LOGGER.warning("Conso journalière aberrante (%s L), remise à 0", daily_raw)
             daily_consumption = 0
         else:
+            # Si la consommation est valide, on l'assigne
             daily_consumption = daily_raw
-        
-        # Empêcher l'ajout de la consommation totale traitée lors d'un reboot
-        if daily_consumption == 0 and total_vol > 0:
-            # Ne pas ajouter le total_volume si c'est un reboot (on considère que ce volume ne doit pas être compté)
-            _LOGGER.info("Reboot détecté, la consommation totale n'est pas ajoutée.")
-            daily_consumption = 0
+
+        # Vérifier si le volume total est trop élevé après un reboot
+        if total_vol > 1000:  # Par exemple, tu peux ajuster ce seuil
+            _LOGGER.info("Volume total élevé (%s L), probablement un reboot. La consommation n'est pas ajoutée.", total_vol)
+            daily_consumption = 0  # Ne pas ajouter la consommation en cas de redémarrage
 
         parsed.update({
             "salt_level": dashboard.get("percentage"),
