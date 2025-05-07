@@ -3,7 +3,7 @@ import logging
 from .curl_wrapper import async_curl_get, CannotConnect
 from datetime import date
 
-MAX_DAILY_CONSUMPTION = 1000  # litres (évite les valeurs aberrentes)
+MAX_DAILY_CONSUMPTION = 1000  # litres (évite les valeurs folles)
 _LOGGER = logging.getLogger(__name__)
 
 class ErieAPI:
@@ -82,7 +82,7 @@ class ErieAPI:
             except Exception as e:
                 _LOGGER.error("Erreur en récupérant %s: %s", key, str(e))
         return self._parse_data(data)
-    
+
     def _parse_data(self, raw_data: Dict) -> Dict:
         parsed = {}
         try:
@@ -91,54 +91,37 @@ class ErieAPI:
             # Info (contient last_regeneration et nr_regenerations et total_volume)
             info = raw_data.get("info", {})
             # Settings
-            settings = raw_data.get("settings", {}).get("settings", {})
+            # settings = raw_data.get("settings", {}).get("settings", {})
             # Flow
             flow = raw_data.get("flow", {})
             # Graph (pour la consommation journalière)
             graph_obj = raw_data.get("graph", {})
-    
-            # Calcul de la consommation journalière brute depuis le graph
             if isinstance(graph_obj, dict):
                 graph_data = graph_obj.get("graph", [])
             elif isinstance(graph_obj, list):
                 graph_data = graph_obj
             else:
                 graph_data = []
-            daily_raw = sum(int(item.get("y", 0)) for item in graph_data)
-    
-            # Récupération du volume total traité pour servir de plafond
-            total_vol = 0
-            try:
-                total_vol = int(info.get("total_volume", "0").split()[0])
-            except Exception:
-                total_vol = 0
-    
-            # Vérification de la consommation journalière
-            if daily_raw > MAX_DAILY_CONSUMPTION:
-                # Si la consommation dépasse le seuil MAX_DAILY_CONSUMPTION, on la remet à zéro
-                _LOGGER.warning("Conso journalière aberrante (%s L), remise à 0", daily_raw)
-                daily_consumption = 0
-            else:
-                # Si la consommation est valide, on l'assigne
-                daily_consumption = daily_raw
-    
-            # Vérifier si le volume total est trop élevé après un reboot
-            if total_vol > 1000:  # Par exemple, tu peux ajuster ce seuil
-                _LOGGER.info("Volume total élevé (%s L), probablement un reboot. La consommation n'est pas ajoutée.", total_vol)
-                daily_consumption = 0  # Ne pas ajouter la consommation en cas de redémarrage
-    
+            # Convertir les valeurs "y" en int pour la somme
+            daily_consumption = sum(int(item.get("y", 0)) for item in graph_data)
+            
             parsed.update({
                 "salt_level": dashboard.get("percentage"),
                 "water_volume": dashboard.get("extra", "0 L").split()[0],
                 "days_remaining": dashboard.get("days_remaining"),
-                # Utilisation des informations issues de "info"
                 "last_regeneration": info.get("last_regeneration"),
                 "nr_regenerations": info.get("nr_regenerations"),
-                "total_volume": info.get("total_volume", "0 L").split()[0],
                 "software_version": info.get("software"),
                 "flow": flow.get("flow"),
                 "daily_consumption": daily_consumption,
             })
+
+            # Ajouter total_volume uniquement s'il est non nul
+            total_volume_value = info.get("total_volume", "0 L").split()[0]
+            if total_volume_value != "0":
+                parsed["total_volume"] = total_volume_value
+
+            # Ajout d'une information supplémentaire si nécessaire
         except Exception as e:
             _LOGGER.error("Erreur lors du parsing des données: %s", str(e))
         return parsed
